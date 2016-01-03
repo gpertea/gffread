@@ -1,4 +1,4 @@
-GCLDIR := ./gclib
+GCLDIR := ../gclib
 SEARCHDIRS := -I. -I${GCLDIR}
 
 SYSTYPE :=     $(shell uname)
