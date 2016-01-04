@@ -13,7 +13,7 @@ endif
 CC      := g++
 
 BASEFLAGS  := -Wall -Wextra ${SEARCHDIRS} $(MARCH) -D_FILE_OFFSET_BITS=64 \
--D_LARGEFILE_SOURCE -D_REENTRANT -fno-strict-aliasing -fno-exceptions -fno-rtti
+-D_LARGEFILE_SOURCE -D_REENTRANT -D_DARWIN_C_SOURCE -fno-strict-aliasing -fno-exceptions -fno-rtti
 
 #add the link-time optimization flag if gcc version > 4.5
 GCC_VERSION:=$(subst ., ,$(shell gcc -dumpversion))
