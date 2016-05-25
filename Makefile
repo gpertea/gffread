@@ -13,7 +13,7 @@ endif
 CC      := g++
 
 BASEFLAGS  := -Wall -Wextra ${SEARCHDIRS} $(MARCH) -D_FILE_OFFSET_BITS=64 \
--D_LARGEFILE_SOURCE -D_REENTRANT -D_DARWIN_C_SOURCE -fno-strict-aliasing -fno-exceptions -fno-rtti
+-D_LARGEFILE_SOURCE -D_REENTRANT -fno-strict-aliasing -fno-exceptions -fno-rtti
 
 #add the link-time optimization flag if gcc version > 4.5
 GCC_VERSION:=$(subst ., ,$(shell gcc -dumpversion))
@@ -28,11 +28,6 @@ GCC45OPTMAIN :=
 ifeq ($(findstring release,$(MAKECMDGOALS)),release)
   CFLAGS := -O2 -DNDEBUG $(BASEFLAGS)
   LDFLAGS :=
-  ifeq ($(shell expr $(GCC_MAJOR).$(GCC_MINOR) '>=' 4.5),1)
-    #CFLAGS += -flto
-    #GCC45OPTS := -flto
-    #GCC45OPTMAIN := -fwhole-program
-  endif
 else
   CFLAGS := -g -DDEBUG $(BASEFLAGS)
   LDFLAGS := -g
@@ -48,7 +43,6 @@ LIBS :=
 OBJS := ${GCLDIR}/GBase.o ${GCLDIR}/GArgs.o ${GCLDIR}/GFaSeqGet.o \
  ${GCLDIR}/gdna.o ${GCLDIR}/codons.o ${GCLDIR}/gff.o ${GCLDIR}/GStr.o \
  ${GCLDIR}/GFastaIndex.o gff_utils.o
-# ${GCLDIR}/gcdb.o ${GCLDIR}/GCdbYank.o
  
 .PHONY : all
 all:    gffread

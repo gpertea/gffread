@@ -2,7 +2,7 @@
 #include "gff_utils.h"
 #include <ctype.h>
 
-#define VERSION "0.9.4f"
+#define VERSION "0.9.4"
 
 #define USAGE "Usage:\n\
 gffread <input_gff> [-g <genomic_seqs_fasta> | <dir>][-s <seq_info.fsize>] \n\
@@ -599,7 +599,6 @@ void openfw(FILE* &f, GArgs& args, char opt) {
 }
 
 #define FWCLOSE(fh) if (fh!=NULL && fh!=stdout) fclose(fh)
-#define FRCLOSE(fh) if (fh!=NULL && fh!=stdin) fclose(fh)
 
 void printGff3Header(FILE* f, GArgs& args) {
   fprintf(f, "# ");
@@ -842,9 +841,9 @@ int main(int argc, char * const argv[]) {
                else 
                  if ((f_in=fopen(infile, "r"))==NULL)
                     GError("Error: cannot open input file %s!\n",infile.chars());
+                 else fclose(f_in);
           }
-        else 
-          infile="-";
+        else infile="-";
    GffLoader gffloader(infile.chars());
    gffloader.transcriptsOnly=mRNAOnly;
    gffloader.fullAttributes=fullattr;
@@ -1048,7 +1047,6 @@ int main(int argc, char * const argv[]) {
  //if (faseq!=NULL) delete faseq;
  //if (gcdb!=NULL) delete gcdb;
  GFREE(rfltGSeq);
- FRCLOSE(f_in);
  FWCLOSE(f_out);
  FWCLOSE(f_w);
  FWCLOSE(f_x);

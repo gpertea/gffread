@@ -691,6 +691,6 @@ void GffLoader::load(GList<GenomicSeqData>& seqdata, GFValidateFunc* gf_validate
 		}
 	} //for each read gffObj
 	//if (verbose) GMessage("  .. %d records from %s clustered into loci.\n", gffr->gflst.Count(), fname.chars());
-	if (f!=stdin) { fclose(f); f=NULL; }
+	//if (f && f!=stdin) { fclose(f); f=NULL; }
 	delete gffr;
 }
