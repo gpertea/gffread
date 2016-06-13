@@ -11,9 +11,11 @@ mkdir $pack
 mkdir $pack/gclib
 libdir=$pack/gclib/
 
-cp -p Makefile gffread.cpp gff_utils.{h,cpp} $pack/
-cp -p ./gclib/{GVec,GList,GHash}.hh $libdir
-cp -p ./gclib/{GArgs,GBase,gdna,GStr,gff,codons,GFaSeqGet,GFastaIndex}.{h,cpp} $libdir
+cp -p gffread.cpp gff_utils.{h,cpp} $pack/
+sed 's|\.\./gclib|./gclib|' Makefile > $pack/Makefile
+
+cp -p ../gclib/{GVec,GList,GHash}.hh $libdir
+cp -p ../gclib/{GArgs,GBase,gdna,GStr,gff,codons,GFaSeqGet,GFastaIndex}.{h,cpp} $libdir
 tar cvfz $pack.tar.gz $pack
 ls -l $pack.tar.gz
 

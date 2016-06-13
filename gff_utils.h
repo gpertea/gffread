@@ -587,9 +587,12 @@ struct GffLoader {
             }
           }
       }
+  /*
+  //GffReader will take care of this
   ~GffLoader() {
       if (f!=NULL && f!=stdin) fclose(f);
       }
+  */
 };
 
 void printFasta(FILE* f, GStr& defline, char* seq, int seqlen=-1);

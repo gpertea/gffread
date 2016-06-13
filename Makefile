@@ -1,4 +1,4 @@
-GCLDIR := ./gclib
+GCLDIR := ../gclib
 SEARCHDIRS := -I. -I${GCLDIR}
 
 SYSTYPE :=     $(shell uname)
@@ -28,11 +28,6 @@ GCC45OPTMAIN :=
 ifeq ($(findstring release,$(MAKECMDGOALS)),release)
   CFLAGS := -O2 -DNDEBUG $(BASEFLAGS)
   LDFLAGS :=
-  ifeq ($(shell expr $(GCC_MAJOR).$(GCC_MINOR) '>=' 4.5),1)
-    #CFLAGS += -flto
-    #GCC45OPTS := -flto
-    #GCC45OPTMAIN := -fwhole-program
-  endif
 else
   CFLAGS := -g -DDEBUG $(BASEFLAGS)
   LDFLAGS := -g
@@ -48,7 +43,6 @@ LIBS :=
 OBJS := ${GCLDIR}/GBase.o ${GCLDIR}/GArgs.o ${GCLDIR}/GFaSeqGet.o \
  ${GCLDIR}/gdna.o ${GCLDIR}/codons.o ${GCLDIR}/gff.o ${GCLDIR}/GStr.o \
  ${GCLDIR}/GFastaIndex.o gff_utils.o
-# ${GCLDIR}/gcdb.o ${GCLDIR}/GCdbYank.o
  
 .PHONY : all
 all:    gffread
