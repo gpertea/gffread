@@ -366,7 +366,7 @@ bool process_transcript(GFastaDb& gfasta, GffObj& gffrec) {
   int aalen=0;
   for (int i=1;i<gffrec.exons.Count();i++) {
      int ilen=gffrec.exons[i]->start-gffrec.exons[i-1]->end-1;
-     if (ilen>4000000) 
+     if (verbose && ilen>4000000)
             GMessage("Warning: very large intron (%d) for transcript %s\n",
                            ilen, gffrec.getID());
      if (ilen>maxintron) {
