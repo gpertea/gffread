@@ -4,7 +4,7 @@
 
 #define VERSION "0.9.6"
 
-#define USAGE "Usage:\n\
+#define USAGE "gffread v"VERSION". Usage:\n\
 gffread <input_gff> [-g <genomic_seqs_fasta> | <dir>][-s <seq_info.fsize>] \n\
  [-o <outfile.gff>] [-t <tname>] [-r [[<strand>]<chr>:]<start>..<end> [-R]]\n\
  [-CTVNJMKQAFGUBHZWTOLE] [-w <exons.fa>] [-x <cds.fa>] [-y <tr_cds.fa>]\n\
@@ -603,6 +603,7 @@ void openfw(FILE* &f, GArgs& args, char opt) {
 void printGff3Header(FILE* f, GArgs& args) {
   fprintf(f, "# ");
   args.printCmdLine(f);
+  fprintf(f, "# gffread v"VERSION"\n");
   fprintf(f, "##gff-version 3\n");
   //for (int i=0;i<gseqdata.Count();i++) {
   //
@@ -677,7 +678,7 @@ bool validateGffRec(GffObj* gffrec, GList<GffObj>* gfnew) {
 
 int main(int argc, char * const argv[]) {
  GArgs args(argc, argv, 
-   "debug;merge;cluster-only;help;force-exons;no-pseudo;MINCOV=MINPID=hvOUNHWCVJMKQNSXTDAPRZFGLEm:g:i:r:s:t:a:b:o:w:x:y:d:");
+   "version;debug;merge;cluster-only;help;force-exons;no-pseudo;MINCOV=MINPID=hvOUNHWCVJMKQNSXTDAPRZFGLEm:g:i:r:s:t:a:b:o:w:x:y:d:");
  args.printError(USAGE, true);
  if (args.getOpt('h') || args.getOpt("help")) {
     GMessage("%s",USAGE);
@@ -725,7 +726,10 @@ int main(int argc, char * const argv[]) {
      fprintf(stderr, "Command line was:\n");
      args.printCmdLine(stderr);
      }
-
+ if (args.getOpt("version")) {
+  GMessage(VERSION"\n");
+  exit(0);
+ }
  fullattr=(args.getOpt('F')!=NULL);
  if (args.getOpt('G')==NULL) 
     noExonAttr=!fullattr;
