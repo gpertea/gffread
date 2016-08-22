@@ -233,6 +233,7 @@ GffObj* redundantTranscripts(GffObj& ti, GffObj&  tj, bool matchAllIntrons, bool
       }
  if (imax==0 && jmax==0) {
      //single-exon transcripts: if fuzzSpan, at least 80% of the shortest one must be overlapped by the other
+	 if (ti.CDstart != tj.CDstart || ti.CDend != tj.CDend) return NULL;
      if (fuzzSpan) {
          return (ti.exons[0]->overlapLen(tj.exons[0])>=minlen*0.8) ? bigger : NULL;
          }
@@ -633,7 +634,6 @@ void GffLoader::load(GList<GenomicSeqData>& seqdata, GFValidateFunc* gf_validate
 			if (is_pseudo) continue;
 			//last resort:
 			//  scan all the attribute values for "pseudogene" keyword (NCBI does that for "product" attr)
-			/*
 			 if (m->attrs!=NULL) {
 				 for (int i=0;i<m->attrs->Count();++i) {
 					 GffAttr& a=*(m->attrs->Get(i));
@@ -644,7 +644,7 @@ void GffLoader::load(GList<GenomicSeqData>& seqdata, GFValidateFunc* gf_validate
 				 }
 			 }
 			 if (is_pseudo) continue;
-			 */
+
 		} //pseudogene detection requested
 		char* rloc=m->getAttr("locus");
 		if (rloc!=NULL && startsWith(rloc, "RLOC_")) {
