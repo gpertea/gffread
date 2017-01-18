@@ -4,7 +4,7 @@
 
 #define VERSION "0.9.8"
 
-#define USAGE "gffread v"VERSION". Usage:\n\
+#define USAGE "gffread v" VERSION ". Usage:\n\
 gffread <input_gff> [-g <genomic_seqs_fasta> | <dir>][-s <seq_info.fsize>] \n\
  [-o <outfile.gff>] [-t <tname>] [-r [[<strand>]<chr>:]<start>..<end> [-R]]\n\
  [-CTVNJMKQAFGUBHZWTOLE] [-w <exons.fa>] [-x <cds.fa>] [-y <tr_cds.fa>]\n\
@@ -603,7 +603,7 @@ void openfw(FILE* &f, GArgs& args, char opt) {
 void printGff3Header(FILE* f, GArgs& args) {
   fprintf(f, "# ");
   args.printCmdLine(f);
-  fprintf(f, "# gffread v"VERSION"\n");
+  fprintf(f, "# gffread v" VERSION "\n");
   fprintf(f, "##gff-version 3\n");
   //for (int i=0;i<gseqdata.Count();i++) {
   //
