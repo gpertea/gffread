@@ -1,7 +1,6 @@
 #include "gff_utils.h"
 
 extern bool verbose;
-//extern bool debugMode;
 
 //bool debugState=false;
 
@@ -603,6 +602,12 @@ void GffLoader::load(GList<GenomicSeqData>& seqdata, GFValidateFunc* gf_validate
 	//add to GenomicSeqData, adding to existing loci and identifying intron-chain duplicates
 	for (int k=0;k<gffr->gflst.Count();k++) {
 		GffObj* m=gffr->gflst[k];
+		/*
+		if (debugMode) {
+			fprintf(stdout, "##GffObj: %s:%d-%d\n", m->getID(), m->start, m->end);
+			m->printGff(stdout);
+		}
+		*/
 		if (strcmp(m->getFeatureName(), "locus")==0 &&
 				m->getAttr("transcripts")!=NULL) {
 			continue; //discard locus meta-features
@@ -673,16 +678,6 @@ void GffLoader::load(GList<GenomicSeqData>& seqdata, GFValidateFunc* gf_validate
 			gdata=new GenomicSeqData(m->gseq_id);
 			seqdata.Add(gdata);
 		}
-		/*
-		for (int k=0;k<gfadd.Count();k++) {
-			bool keep=placeGf(gfadd[k], gdata, doCluster, doCollapseRedundant, matchAllIntrons, fuzzSpan);
-			if (!keep) {
-				gfadd[k]->isUsed(false);
-				//DEBUG
-				GMessage("Feature %s(%d-%d) is going to be discarded..\n",gfadd[k]->getID(), gfadd[k]->start, gfadd[k]->end);
-			}
-		}
-		*/
 		bool keep=placeGf(m, gdata, doCluster, doCollapseRedundant, matchAllIntrons, fuzzSpan);
 		if (!keep) {
 			m->isUsed(false);

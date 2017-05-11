@@ -985,11 +985,11 @@ int main(int argc, char * const argv[]) {
         GTData* tdata=(GTData*)(t.uptr);
         if (tdata->replaced_by!=NULL) continue;
         if (process_transcript(gfasta, t)) {
-           //t.udata|=4; //tag it as valid
            numvalid++;
-           if (f_out) {
+           if (f_out && (t.udata & 4) ==0 ) {
              if (tdata->geneinfo) tdata->geneinfo->finalize();
              out_counter++;
+             t.udata |=4;
              if (fmtGTF) t.printGxf(f_out, exonPrinting, tracklabel, NULL, decodeChars);
                else {
                 if (firstGff3Print) { printGff3Header(f_out, args);firstGff3Print=false; }

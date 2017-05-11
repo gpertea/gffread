@@ -5,6 +5,8 @@
 #include "GFastaIndex.h"
 #include "GFaSeqGet.h"
 
+extern bool debugMode;
+
 typedef bool GFValidateFunc(GffObj* gf, GList<GffObj>* gfadd);
 
 class GeneInfo { //for Ensembl GTF conversion
