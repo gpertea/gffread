@@ -395,16 +395,7 @@ bool GffLoader::placeGf(GffObj* t, GenomicSeqData* gdata, bool doCluster, bool c
   	}
   }
 
-  /*
-	if (t->exons.Count()==0  && t->children.Count()==0 && forceExons) {
-		//a non-mRNA feature with no subfeatures
-		//just so we get some sequence functions working, add a dummy "exon"-like subfeature here
-		//--this could be a single "pseudogene" entry or another genomic region without exons
-		//
-		t->addExon(t->start,t->end);
-	}
-  */
-  if (t->exons.Count()>0) {
+  if (t->exons.Count()>0) { //treating this entry as a transcript
                 gdata->rnas.Add(t); //added it in sorted order
     		    if (tdata==NULL) {
     		       tdata=new GTData(t); //additional transcript data
@@ -650,8 +641,14 @@ void GffLoader::load(GList<GenomicSeqData>& seqdata, GFValidateFunc* gf_validate
 		if (rloc!=NULL && startsWith(rloc, "RLOC_")) {
 			m->removeAttr("locus", rloc);
 		}
-		if (forceExons) {  // && m->children.Count()==0) {
-			m->exon_ftype_id=gff_fid_exon;
+		if (forceExons || (m->isGene() && m->exons.Count()==0 && m->children.Count()==0)) {  // && m->children.Count()==0) {
+			if (m->exons.Count()==0 && m->children.Count()==0) {
+					m->exon_ftype_id=gff_fid_exon;
+					//a non-mRNA feature with no subfeatures
+					//just so we get some sequence functions working, add a dummy "exon"-like subfeature here
+					//--this could be a single "pseudogene" entry or another gene defined without transcripts or exons
+					m->addExon(m->start,m->end);
+			  }
 		}
 		//GList<GffObj> gfadd(false,false); -- for gf_validate()?
 		if (gf_validate!=NULL && !(*gf_validate)(m, NULL)) {

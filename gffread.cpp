@@ -2,7 +2,7 @@
 #include "gff_utils.h"
 #include <ctype.h>
 
-#define VERSION "0.9.8c"
+#define VERSION "0.9.8d"
 
 #define USAGE "gffread v" VERSION ". Usage:\n\
 gffread <input_gff> [-g <genomic_seqs_fasta> | <dir>][-s <seq_info.fsize>] \n\
