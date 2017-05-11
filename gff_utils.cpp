@@ -371,14 +371,16 @@ bool GffLoader::placeGf(GffObj* t, GenomicSeqData* gdata, bool doCluster, bool c
   	int gidx=gdata->gfs.Count()-1;
   	while (gidx>=0 && gdata->gfs[gidx]->end>=t->start) {
   		GffObj& g = *(gdata->gfs[gidx]);
+  		//find an overlappin gene object for this transcript
   		if (g.isGene() && t->strand==g.strand && exonOverlap2Gene(t, g)) {
-  			g.children.Add(t);
+  			if (g.children.IndexOf(t)<0)
+  				g.children.Add(t);
   			keep=true;
   			if (tdata==NULL) {
   		       tdata=new GTData(t); //additional transcript data
   		       gdata->tdata.Add(tdata);
   			}
-  			t->parent=&g;
+  			if (t->parent==NULL) t->parent=&g;
   			//disable printing of gene if transcriptsOnly
   			if (transcriptsOnly) {
   				g.udata|=4; //tag it as non-printable
@@ -394,7 +396,7 @@ bool GffLoader::placeGf(GffObj* t, GenomicSeqData* gdata, bool doCluster, bool c
   		--gidx;
   	}
   }
-
+  bool noexon_gfs=false;
   if (t->exons.Count()>0) { //treating this entry as a transcript
                 gdata->rnas.Add(t); //added it in sorted order
     		    if (tdata==NULL) {
@@ -412,7 +414,9 @@ bool GffLoader::placeGf(GffObj* t, GenomicSeqData* gdata, bool doCluster, bool c
         		       tdata=new GTData(t); //additional transcript data
         		       gdata->tdata.Add(tdata);
         		   }
-              	   return true;
+              	   //return true;
+        		   noexon_gfs=true;
+        		   keep=true;
                  }
               else
                  return false; //nothing to do with these non-transcript objects
@@ -423,7 +427,7 @@ bool GffLoader::placeGf(GffObj* t, GenomicSeqData* gdata, bool doCluster, bool c
   if (gdata->loci.Count()==0) {
        gdata->loci.Add(new GffLocus(t));
        return true; //new locus on this ref seq
-       }
+  }
   int nidx=qsearch_gloci(t->end, gdata->loci); //get index of nearest locus starting just ABOVE t->end
   //GMessage("\tlooking up end coord %d in gdata->loci.. (qsearch got nidx=%d)\n", t->end, nidx);
   if (nidx==0) {
@@ -431,7 +435,7 @@ bool GffLoader::placeGf(GffObj* t, GenomicSeqData* gdata, bool doCluster, bool c
      //if (debug) GMessage("  <<no ovls possible, create locus %d-%d \n",t->start, t->end);
      gdata->loci.Add(new GffLocus(t));
      return true;
-     }
+  }
   if (nidx==-1) nidx=gdata->loci.Count();//all loci start below t->end
   int lfound=0; //count of parent loci
   GArray<int> mrgloci(false);
@@ -448,12 +452,13 @@ bool GffLoader::placeGf(GffObj* t, GenomicSeqData* gdata, bool doCluster, bool c
                //this should never be the case if nidx was found correctly
                GMessage("Warning: qsearch_gloci found loc.start>t.end!(t=%s)\n", t->getID());
                continue;
-               }
-      if (loc.add_RNA(t)) {
+      }
+
+      if (loc.add_gfobj(t)) {
          //will add this transcript to loc
          lfound++;
          mrgloci.Add(l);
-         if (collapseRedundant) {
+         if (collapseRedundant && !noexon_gfs) {
            //compare to every single transcript in this locus
            for (int ti=0;ti<loc.rnas.Count();ti++) {
                  if (loc.rnas[ti]==t) continue;
@@ -641,6 +646,10 @@ void GffLoader::load(GList<GenomicSeqData>& seqdata, GFValidateFunc* gf_validate
 		if (rloc!=NULL && startsWith(rloc, "RLOC_")) {
 			m->removeAttr("locus", rloc);
 		}
+		if (forceExons) {
+			m->exon_ftype_id=gff_fid_exon;
+		}
+		/*
 		if (forceExons || (m->isGene() && m->exons.Count()==0 && m->children.Count()==0)) {  // && m->children.Count()==0) {
 			if (m->exons.Count()==0 && m->children.Count()==0) {
 					m->exon_ftype_id=gff_fid_exon;
@@ -650,6 +659,7 @@ void GffLoader::load(GList<GenomicSeqData>& seqdata, GFValidateFunc* gf_validate
 					m->addExon(m->start,m->end);
 			  }
 		}
+		*/
 		//GList<GffObj> gfadd(false,false); -- for gf_validate()?
 		if (gf_validate!=NULL && !(*gf_validate)(m, NULL)) {
 			continue;

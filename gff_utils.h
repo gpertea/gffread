@@ -257,6 +257,7 @@ public:
     bool is_mrna;
     char strand;
     GffObj* t_maxcov;  //transcript with maximum coverage (for main "ref" transcript)
+    GList<GffObj> gfs; //list of non-transcripts (genes) in this locus
     GList<GffObj> rnas; //list of transcripts (isoforms) for this locus
     GArray<GSeg> mexons; //list of merged exons in this region
     GList<CGeneSym> gene_names;
@@ -299,7 +300,7 @@ public:
        return NULL;
        }
 
-    GffLocus(GffObj* t=NULL):rnas(true,false,false),mexons(true,true),
+    GffLocus(GffObj* t=NULL):gfs(true,false,false), rnas(true,false,false),mexons(true,true),
            gene_names(true,true,false), gene_ids(true,true,false) {
         //this will NOT free rnas!
         t_maxcov=NULL;
@@ -310,27 +311,70 @@ public:
         end=0;
         strand=0;
         is_mrna=false;
+
         if (t!=NULL) {
-           start=t->exons.First()->start;
-           end=t->exons.Last()->end;;
-           gseq_id=t->gseq_id;
            GSeg seg;
-           for (int i=0;i<t->exons.Count();i++) {
-                seg.start=t->exons[i]->start;
-                seg.end=t->exons[i]->end;
-                mexons.Add(seg);
-                }
-           rnas.Add(t);
+           bool is_t=(t->exons.Count()>0);
+           if (is_t) {
+             start=t->exons.First()->start;
+             end=t->exons.Last()->end;
+             for (int i=0;i<t->exons.Count();i++) {
+               seg.start=t->exons[i]->start;
+               seg.end=t->exons[i]->end;
+               mexons.Add(seg);
+             }
+             rnas.Add(t);
+           }
+           else {
+        	   start=t->start;
+        	   end=t->end;
+        	   seg.start=start;
+        	   seg.end=end;
+        	   mexons.Add(seg);
+        	   gfs.Add(t);
+           }
+           gseq_id=t->gseq_id;
            ((GTData*)(t->uptr))->locus=this;
            t_maxcov=t;
            strand=t->strand;
            if (t->ftype_id==gff_fid_mRNA) {
               is_mrna=true;
-              }
            }
+        }
     }
 
-   void addMerge(GffLocus& locus, GffObj* lnkrna) {
+    void print(FILE *f, int idxfirstvalid, GStr& locname, GStr& loctrack, bool fmtGTF) {
+        const char* gseqname=NULL;
+        if (rnas.Count()>0) gseqname=rnas[0]->getGSeqName();
+        else gseqname=gfs[0]->getGSeqName();
+        if (!fmtGTF) {
+          fprintf(f,"%s\t%s\tlocus\t%d\t%d\t.\t%c\t.\tID=%s;locus=%s",
+                   gseqname, loctrack.chars(), this->start, this->end, this->strand,
+                    locname.chars(), locname.chars());
+          //const char* loc_gname=loc.getGeneName();
+          if (this->gene_names.Count()>0) { //print all gene names associated to this locus
+             fprintf(f, ";genes=%s",this->gene_names.First()->name.chars());
+             for (int i=1;i<this->gene_names.Count();i++) {
+               fprintf(f, ",%s",this->gene_names[i]->name.chars());
+               }
+             }
+          if (this->gene_ids.Count()>0) { //print all GeneIDs names associated to this locus
+             fprintf(f, ";geneIDs=%s",this->gene_ids.First()->name.chars());
+             for (int i=1;i<this->gene_ids.Count();i++) {
+               fprintf(f, ",%s",this->gene_ids[i]->name.chars());
+               }
+             }
+          if (idxfirstvalid>=0) {
+            fprintf(f, ";transcripts=%s",this->rnas[idxfirstvalid]->getID());
+            for (int i=idxfirstvalid+1;i<this->rnas.Count();i++) {
+              fprintf(f, ",%s",this->rnas[i]->getID());
+            }
+          }
+          fprintf(f, "\n");
+        }
+    }
+
+    void addMerge(GffLocus& locus, GffObj* lnkrna) {
      //add all the elements of the other locus (merging)
      //-- merge mexons
      GArray<int> ovlexons(true,true); //list of locus.mexons indexes overlapping existing mexons
@@ -371,8 +415,13 @@ public:
      for (int i=0;i<locus.rnas.Count();i++) {
           ((GTData*)(locus.rnas[i]->uptr))->locus=this;
           if (locus.rnas[i]!=lnkrna) rnas.Add(locus.rnas[i]);
-          }
-        // -- adjust start/end as needed
+     }
+     for (int i=0;i<locus.gfs.Count();i++) {
+          ((GTData*)(locus.gfs[i]->uptr))->locus=this;
+          if (locus.gfs[i]!=lnkrna) gfs.Add(locus.gfs[i]);
+     }
+
+     // -- adjust start/end as needed
      if (start>locus.start) start=locus.start;
      if (end<locus.end) end=locus.end;
      if (locus.is_mrna) is_mrna=true;
@@ -398,62 +447,96 @@ public:
         return false;
     }
 
-    bool add_RNA(GffObj* t) {
+    bool add_gfobj(GffObj* t) {
         //if (rnas.Count()==0) return true; //? should never be called on an empty locus
         if (t->gseq_id!=gseq_id || t->strand!=strand || t->start>end || start>t->end)
               return false; //rna must be on the same genomic seq
         //check for exon overlap with existing mexons
         //also update mexons accordingly if t is to be added
         bool hasovl=false;
-        int i=0; //index of first mexons with a merge
-        int j=0; //index current t exon
-        GArray<int> ovlexons(true,true); //list of mrna exon indexes overlapping mexons
-        while (i<mexons.Count() && j<t->exons.Count()) {
-            uint istart=mexons[i].start;
-            uint iend=mexons[i].end;
-            uint jstart=t->exons[j]->start;
-            uint jend=t->exons[j]->end;
-            if (iend<jstart) { i++; continue; }
-            if (jend<istart) { j++; continue; }
-            //exon overlap found if we're here:
-            ovlexons.Add(j);
-            hasovl=true;
-            //extend mexons[i] as needed
-            if (jstart<istart) mexons[i].start=jstart;
-            if (jend>iend) { //mexon stretch up
-                mexons[i].end=jend;
-                //now this could overlap the next mexon(s), so we have to merge them all
-                while (i<mexons.Count()-1 && mexons[i].end>mexons[i+1].start) {
-                    uint nextend=mexons[i+1].end;
-                    mexons.Delete(i+1);
-                    if (nextend>mexons[i].end) {
-                        mexons[i].end=nextend;
-                        break; //no need to check next mexons
-                    }
-                } //while next mexons merge
-            } //possible mexons merge
+        if (t->exons.Count()>0) {
+			int i=0; //index of first mexons with a merge
+			int j=0; //index current t exon
+			GArray<int> ovlexons(true,true); //list of mrna exon indexes overlapping mexons
+			while (i<mexons.Count() && j<t->exons.Count()) {
+				uint istart=mexons[i].start;
+				uint iend=mexons[i].end;
+				uint jstart=t->exons[j]->start;
+				uint jend=t->exons[j]->end;
+				if (iend<jstart) { i++; continue; }
+				if (jend<istart) { j++; continue; }
+				//exon overlap found if we're here:
+				ovlexons.Add(j);
+				hasovl=true;
+				//extend mexons[i] as needed
+				if (jstart<istart) mexons[i].start=jstart;
+				if (jend>iend) { //mexon stretch up
+					mexons[i].end=jend;
+					//now this could overlap the next mexon(s), so we have to merge them all
+					while (i<mexons.Count()-1 && mexons[i].end>mexons[i+1].start) {
+						uint nextend=mexons[i+1].end;
+						mexons.Delete(i+1);
+						if (nextend>mexons[i].end) {
+							mexons[i].end=nextend;
+							break; //no need to check next mexons
+						}
+					} //while next mexons merge
+				} //possible mexons merge
 
-            j++; //check the next t exon
-        }//all vs all exon check loop
-        if (hasovl) {
-            GSeg seg;
-             //add the rest of the non-overlapping exons
-            for (int i=0;i<t->exons.Count();i++) {
-                seg.start=t->exons[i]->start;
-                seg.end=t->exons[i]->end;
-                if (!ovlexons.Exists(i)) mexons.Add(seg);
-                }
-            rnas_add(t);
-            // add to rnas
-            ((GTData*)t->uptr)->locus=this;
-            gseq_id=t->gseq_id;
-            }
+				j++; //check the next t exon
+			}//all vs all exon check loop
+	        if (hasovl) {
+	            GSeg seg;
+	             //add the rest of the non-overlapping exons
+	            for (int i=0;i<t->exons.Count();i++) {
+	                seg.start=t->exons[i]->start;
+	                seg.end=t->exons[i]->end;
+	                if (!ovlexons.Exists(i)) mexons.Add(seg);
+	                }
+	            t_add(t);
+	            // add to rnas
+	            ((GTData*)t->uptr)->locus=this;
+	            gseq_id=t->gseq_id;
+	        }
+        } else {
+        	//gene overlap check
+        	for (int i=0;i<mexons.Count();++i) {
+				uint istart=mexons[i].start;
+				uint iend=mexons[i].end;
+				uint jstart=t->start;
+				uint jend=t->end;
+				if (iend<jstart) { i++; continue; }
+				if (istart>jend) break;
+				//exon overlap found:
+				hasovl=true;
+				//extend mexons[i] as needed
+				if (jstart<istart) mexons[i].start=jstart;
+				if (jend>iend) { //mexon stretch up
+					mexons[i].end=jend;
+					//now this could overlap the next mexon(s), so we have to merge them all
+					while (i<mexons.Count()-1 && mexons[i].end>mexons[i+1].start) {
+						uint nextend=mexons[i+1].end;
+						mexons.Delete(i+1);
+						if (nextend>mexons[i].end) {
+							mexons[i].end=nextend;
+							break; //no need to check next mexons
+						}
+					} //while next mexons merge
+				} //possible mexons merge
+        	}
+        	if (hasovl) {
+        		t_add(t); // add to locus rnas or gfs
+        		((GTData*)t->uptr)->locus=this;
+        		gseq_id=t->gseq_id;
+        	}
+        }
         return hasovl;
     }
 
-    //simpler,basic adding of a mrna
-    void rnas_add(GffObj* t) {
-      rnas.Add(t);
+    //basic adding of a GffObj to a locus
+    void t_add(GffObj* t) {
+      if (t->exons.Count()>0) rnas.Add(t);
+      else gfs.Add(t);
       // adjust start/end
       //if (start==0 || start>t->start) start=t->start;
       if (start==0) start=t->start;

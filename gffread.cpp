@@ -675,6 +675,31 @@ bool validateGffRec(GffObj* gffrec, GList<GffObj>* gfnew) {
 	return true;
 }
 
+void printGffObj(FILE* f, GffObj* gfo, GStr& locname, GffPrintMode exonPrinting, int& out_counter) {
+    GffObj& t=*gfo;
+    GTData* tdata=(GTData*)(t.uptr);
+    if (tdata->replaced_by!=NULL || ((t.udata & 4)!=0)) return;
+    if (t.exons.Count()==0 && t.children.Count()==0 && forceExons)
+      t.addExon(t.start,t.end);
+    t.udata|=4;
+    t.addAttr("locus", locname.chars());
+    out_counter++;
+    if (fmtGTF) t.printGxf(f, exonPrinting, tracklabel, NULL, decodeChars);
+        else {
+         //print the parent first, if any, and if not printed already
+         if (t.parent!=NULL && ((t.parent->udata & 4)==0)) {
+             GTData* pdata=(GTData*)(t.parent->uptr);
+             if (pdata && pdata->geneinfo!=NULL)
+                  pdata->geneinfo->finalize();
+             t.parent->addAttr("locus", locname.chars());
+             t.parent->printGxf(f, exonPrinting, tracklabel, NULL, decodeChars);
+             t.parent->udata|=4;
+         }
+         t.printGxf(f, exonPrinting, tracklabel, NULL, decodeChars);
+    }
+
+}
+
 
 int main(int argc, char * const argv[]) {
  GArgs args(argc, argv, 
@@ -876,27 +901,14 @@ int main(int argc, char * const argv[]) {
    //grouped in loci
    for (int g=0;g<g_data.Count();g++) {
      GenomicSeqData* gdata=g_data[g];
-     int gfs_i=0;
      for (int l=0;l<gdata->loci.Count();l++) {
+       bool firstLocusPrint=true;
        GffLocus& loc=*(gdata->loci[l]);
        //check all non-replaced transcripts in this locus:
        int numvalid=0;
        int idxfirstvalid=-1;
        for (int i=0;i<loc.rnas.Count();i++) {
          GffObj& t=*(loc.rnas[i]);
-         if (f_out) {
-          while (gfs_i<gdata->gfs.Count() && gdata->gfs[gfs_i]->start<=t.start) {
-             GffObj& gfst=*(gdata->gfs[gfs_i]);
-             if ((gfst.udata&4)==0) { //never printed
-               gfst.udata|=4;
-               if (firstGff3Print) { printGff3Header(f_out, args);firstGff3Print=false; }
-               if (gfst.exons.Count()==0 && gfst.children.Count()==0 && forceExons)
-                gfst.addExon(gfst.start,gfst.end);
-               gfst.printGxf(f_out, exonPrinting, tracklabel, NULL, decodeChars);
-               }
-             ++gfs_i;
-          }
-         }
          GTData* tdata=(GTData*)(t.uptr);
          if (tdata->replaced_by!=NULL) {
             if (f_repl && (t.udata & 8)==0) {
@@ -913,78 +925,42 @@ int main(int argc, char * const argv[]) {
             continue;
             }
          if (process_transcript(gfasta, t)) {
-             t.udata|=4; //tag it as valid
+             //t.udata|=4; //tag it as valid
              numvalid++;
              if (idxfirstvalid<0) idxfirstvalid=i;
              }
-         }
-       if (f_out && numvalid>0) {
-         GStr locname("RLOC_");
-         locname.appendfmt("%08d",loc.locus_num);
-         if (!fmtGTF) {
-           if (firstGff3Print) { printGff3Header(f_out, args);firstGff3Print=false; }
-           fprintf(f_out,"%s\t%s\tlocus\t%d\t%d\t.\t%c\t.\tID=%s;locus=%s",
-                    loc.rnas[0]->getGSeqName(), loctrack.chars(), loc.start, loc.end, loc.strand,
-                     locname.chars(), locname.chars());
-           //const char* loc_gname=loc.getGeneName();
-           if (loc.gene_names.Count()>0) { //print all gene names associated to this locus
-              fprintf(f_out, ";genes=%s",loc.gene_names.First()->name.chars());
-              for (int i=1;i<loc.gene_names.Count();i++) {
-                fprintf(f_out, ",%s",loc.gene_names[i]->name.chars());
-                }
-              }
-           if (loc.gene_ids.Count()>0) { //print all GeneIDs names associated to this locus
-              fprintf(f_out, ";geneIDs=%s",loc.gene_ids.First()->name.chars());
-              for (int i=1;i<loc.gene_ids.Count();i++) {
-                fprintf(f_out, ",%s",loc.gene_ids[i]->name.chars());
-                }
-              }
-           fprintf(f_out, ";transcripts=%s",loc.rnas[idxfirstvalid]->getID());
-           for (int i=idxfirstvalid+1;i<loc.rnas.Count();i++) {
-              fprintf(f_out, ",%s",loc.rnas[i]->getID());
-              }
-           fprintf(f_out, "\n");
-           }
-         //now print all valid, non-replaced transcripts in this locus:
-         for (int i=0;i<loc.rnas.Count();i++) {
-           GffObj& t=*(loc.rnas[i]);
-           GTData* tdata=(GTData*)(t.uptr);
-           if (tdata->replaced_by!=NULL || ((t.udata & 4)==0)) continue;
-           t.addAttr("locus", locname.chars());
-           out_counter++;
-           if (fmtGTF) t.printGxf(f_out, exonPrinting, tracklabel, NULL, decodeChars);
-               else {
-                if (firstGff3Print) { printGff3Header(f_out, args);firstGff3Print=false; }
-                //print the parent first, if any
-                if (t.parent!=NULL && ((t.parent->udata & 4)==0)) {
-                    GTData* pdata=(GTData*)(t.parent->uptr);
-                    if (pdata && pdata->geneinfo!=NULL) 
-                         pdata->geneinfo->finalize();
-                    t.parent->addAttr("locus", locname.chars());
-                    t.parent->printGxf(f_out, exonPrinting, tracklabel, NULL, decodeChars);
-                    t.parent->udata|=4;
-                    }
-                t.printGxf(f_out, exonPrinting, tracklabel, NULL, decodeChars);
-                }
-            }
-          } //have valid transcripts to print
-       }//for each locus
-     //print the rest of the isolated pseudo/gene/region features not printed yet
-     if (f_out) {
-      while (gfs_i<gdata->gfs.Count()) {
-         GffObj& gfst=*(gdata->gfs[gfs_i]);
-         if ((gfst.udata&4)==0) { //never printed
-           gfst.udata|=4;
-           if (firstGff3Print) { printGff3Header(f_out, args);firstGff3Print=false; }
-           if (gfst.exons.Count()==0 && gfst.children.Count()==0 && forceExons)
-             gfst.addExon(gfst.start,gfst.end);
-           gfst.printGxf(f_out, exonPrinting, tracklabel, NULL, decodeChars);
-           }
-         ++gfs_i;
-      }
-     }
+       } //for each transcript
+
+       int rnas_i=0;
+       if (idxfirstvalid>=0) rnas_i=idxfirstvalid;
+       int gfs_i=0;
+       if (f_out) {
+           GStr locname("RLOC_");
+           locname.appendfmt("%08d",loc.locus_num);
+           //GMessage("Locus: %s (%d-%d), %d rnas, %d gfs\n", locname.chars(), loc.start, loc.end,
+           //	   loc.rnas.Count(), loc.gfs.Count());
+		   while (gfs_i<loc.gfs.Count() || rnas_i<loc.rnas.Count()) {
+			   if (gfs_i<loc.gfs.Count() && (rnas_i>=loc.rnas.Count() ||
+					     loc.gfs[gfs_i]->start<=loc.rnas[rnas_i]->start) ) {
+				   //print the gene object first
+				   if (firstGff3Print) { printGff3Header(f_out, args);firstGff3Print=false; }
+				   if (firstLocusPrint) { loc.print(f_out, idxfirstvalid, locname, loctrack, fmtGTF);firstLocusPrint=false; }
+				   printGffObj(f_out, loc.gfs[gfs_i], locname, exonPrinting, out_counter);
+				   ++gfs_i;
+				   continue;
+			   }
+			   if (rnas_i<loc.rnas.Count()) {
+					   if (firstGff3Print) { printGff3Header(f_out, args);firstGff3Print=false; }
+					   if (firstLocusPrint) { loc.print(f_out, idxfirstvalid, locname, loctrack, fmtGTF);firstLocusPrint=false; }
+					   printGffObj(f_out, loc.rnas[rnas_i], locname, exonPrinting, out_counter);
+					   ++rnas_i;
+			   }
+		   }
+       }
+
+     }//for each locus
     } //for each genomic sequence
-   }
+   } //if Clustering enabled
   else {
    //not grouped into loci, print the rnas with their parents, if any
    int numvalid=0;
@@ -1009,7 +985,7 @@ int main(int argc, char * const argv[]) {
         GTData* tdata=(GTData*)(t.uptr);
         if (tdata->replaced_by!=NULL) continue;
         if (process_transcript(gfasta, t)) {
-           t.udata|=4; //tag it as valid
+           //t.udata|=4; //tag it as valid
            numvalid++;
            if (f_out) {
              if (tdata->geneinfo) tdata->geneinfo->finalize();
@@ -1045,7 +1021,7 @@ int main(int argc, char * const argv[]) {
       }
      }
     } //for each genomic seq
-   } //not clustered
+   } //no clustering
  if (f_repl && f_repl!=stdout) fclose(f_repl);
  seqinfo.Clear();
  //if (faseq!=NULL) delete faseq;
