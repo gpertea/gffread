@@ -922,6 +922,7 @@ int main(int argc, char * const argv[]) {
                   }
                fprintf(f_repl, "\n");
                }
+            t.udata|=4; //not going to print this
             continue;
             }
          if (process_transcript(gfasta, t)) {
