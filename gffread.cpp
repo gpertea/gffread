@@ -399,7 +399,6 @@ bool process_transcript(GFastaDb& gfasta, GffObj& gffrec) {
          }
       else { ssValid=false; break; }
       }
-    //GFREE(gseq);
     if (!ssValid) {
       if (verbose)
          GMessage("Invalid splice sites found for '%s'\n",gffrec.getID());

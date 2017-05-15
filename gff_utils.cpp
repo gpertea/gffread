@@ -514,58 +514,98 @@ bool GffLoader::placeGf(GffObj* t, GenomicSeqData* gdata, bool doCluster, bool c
 }
 
 void collectLocusData(GList<GenomicSeqData>& ref_data) {
-  int locus_num=0;
-  for (int g=0;g<ref_data.Count();g++) {
-    GenomicSeqData* gdata=ref_data[g];
-    for (int l=0;l<gdata->loci.Count();l++) {
-      GffLocus& loc=*(gdata->loci[l]);
-      GHash<int> gnames(true); //gene names in this locus
-      GHash<int> geneids(true); //Entrez GeneID: numbers
-      for (int i=0;i<loc.rnas.Count();i++) {
-        GffObj& t=*(loc.rnas[i]);
-        GStr gname(t.getGeneName());
-        if (!gname.is_empty()) {
-           gname.upper();
-           int* prevg=gnames.Find(gname.chars());
-           if (prevg!=NULL) (*prevg)++;
-                  else gnames.Add(gname, new int(1));
-           }
-        //parse GeneID xrefs, if any:
-        GStr xrefs(t.getAttr("xrefs"));
-        if (!xrefs.is_empty()) {
-          xrefs.startTokenize(",");
-          GStr token;
-          while (xrefs.nextToken(token)) {
-            token.upper();
-            if (token.startsWith("GENEID:")) {
-              token.cut(0,token.index(':')+1);
-              int* prevg=geneids.Find(token.chars());
-              if (prevg!=NULL) (*prevg)++;
-                     else geneids.Add(token, new int(1));
-              }
-            } //for each xref
-          } //xrefs parsing
-        }//for each transcript
-      locus_num++;
-      loc.locus_num=locus_num;
-      if (gnames.Count()>0) { //collect all gene names associated to this locus
-         gnames.startIterate();
-         int* gfreq=NULL;
-         char* key=NULL;
-         while ((gfreq=gnames.NextData(key))!=NULL) {
-            loc.gene_names.AddIfNew(new CGeneSym(key,*gfreq));
-            }
-         } //added collected gene_names
-      if (loc.gene_ids.Count()>0) { //collect all GeneIDs names associated to this locus
-         geneids.startIterate();
-         int* gfreq=NULL;
-         char* key=NULL;
-         while ((gfreq=geneids.NextData(key))!=NULL) {
-           loc.gene_ids.AddIfNew(new CGeneSym(key,*gfreq));
-            }
-          }
-      } //for each locus
-  }//for each genomic sequence
+	int locus_num=0;
+	for (int g=0;g<ref_data.Count();g++) {
+		GenomicSeqData* gdata=ref_data[g];
+		for (int l=0;l<gdata->loci.Count();l++) {
+			GffLocus& loc=*(gdata->loci[l]);
+			GHash<int> gnames(true); //gene names in this locus
+			GHash<int> geneids(true); //Entrez GeneID: numbers
+			for (int i=0;i<loc.rnas.Count();i++) {
+				GffObj& t=*(loc.rnas[i]);
+				GStr gname(t.getGeneName());
+				if (!gname.is_empty()) {
+					gname.upper();
+					int* prevg=gnames.Find(gname.chars());
+					if (prevg!=NULL) (*prevg)++;
+					else gnames.Add(gname, new int(1));
+				}
+				GStr geneid(t.getGeneID());
+				if (!geneid.is_empty()) {
+					geneids.Add(geneid.chars(), new int(1));
+				}
+				//parse GeneID xrefs, if any (RefSeq):
+				/*
+				GStr xrefs(t.getAttr("xrefs"));
+				if (!xrefs.is_empty()) {
+					xrefs.startTokenize(",");
+					GStr token;
+					while (xrefs.nextToken(token)) {
+						token.upper();
+						if (token.startsWith("GENEID:")) {
+							token.cut(0,token.index(':')+1);
+							int* prevg=geneids.Find(token.chars());
+							if (prevg!=NULL) (*prevg)++;
+							else geneids.Add(token, new int(1));
+						}
+					} //for each xref
+				} //xrefs parsing
+				*/
+			}//for each transcript
+			for (int i=0;i<loc.gfs.Count();i++) {
+				GffObj& nt=*(loc.gfs[i]);
+				if (nt.isGene()) {
+					GStr gname(nt.getGeneName());
+					if (!gname.is_empty()) {
+						gname.upper();
+						int* prevg=gnames.Find(gname.chars());
+						if (prevg!=NULL) (*prevg)++;
+						else gnames.Add(gname, new int(1));
+					}
+					GStr geneid(nt.getID());
+					if (!geneid.is_empty()) {
+						geneids.Add(geneid.chars(), new int(1));
+					}
+				}
+				//parse GeneID xrefs, if any (RefSeq):
+				/*
+				GStr xrefs(nt.getAttr("xrefs"));
+				if (!xrefs.is_empty()) {
+					xrefs.startTokenize(",");
+					GStr token;
+					while (xrefs.nextToken(token)) {
+						token.upper();
+						if (token.startsWith("GENEID:")) {
+							token.cut(0,token.index(':')+1);
+							int* prevg=geneids.Find(token.chars());
+							if (prevg!=NULL) (*prevg)++;
+							else geneids.Add(token, new int(1));
+						}
+					} //for each xref
+				} //xrefs parsing
+				*/
+			}//for each non-transcript (genes?)
+
+			locus_num++;
+			loc.locus_num=locus_num;
+			if (gnames.Count()>0) { //collect all gene names associated to this locus
+				gnames.startIterate();
+				int* gfreq=NULL;
+				char* key=NULL;
+				while ((gfreq=gnames.NextData(key))!=NULL) {
+					loc.gene_names.AddIfNew(new CGeneSym(key,*gfreq));
+				}
+			} //added collected gene_names
+			if (geneids.Count()>0) { //collect all GeneIDs names associated to this locus
+				geneids.startIterate();
+				int* gfreq=NULL;
+				char* key=NULL;
+				while ((gfreq=geneids.NextData(key))!=NULL) {
+					loc.gene_ids.AddIfNew(new CGeneSym(key,*gfreq));
+				}
+			}
+		} //for each locus
+	}//for each genomic sequence
 }
 
 
