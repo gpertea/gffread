@@ -27,7 +27,7 @@ class GeneInfo { //for Ensembl GTF conversion
      transcripts.Add(new GStr(gfrec->getID()));
      create_gf(gfrec, ensembl_convert);
      }
-     
+
    void create_gf(GffObj* gfrec, bool ensembl_convert) {
      gf=new GffObj(gfrec->getGeneID());
      gf->gseq_id=gfrec->gseq_id;
@@ -502,12 +502,12 @@ public:
 	        }
         } else {
         	//gene overlap check
+			uint jstart=t->start;
+			uint jend=t->end;
         	for (int i=0;i<mexons.Count();++i) {
 				uint istart=mexons[i].start;
 				uint iend=mexons[i].end;
-				uint jstart=t->start;
-				uint jend=t->end;
-				if (iend<jstart) { i++; continue; }
+				if (iend<jstart) continue;
 				if (istart>jend) break;
 				//exon overlap found:
 				hasovl=true;
