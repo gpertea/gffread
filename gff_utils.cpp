@@ -370,8 +370,10 @@ bool GffLoader::placeGf(GffObj* t, GenomicSeqData* gdata, bool doCluster, bool c
   	int gidx=gdata->gfs.Count()-1;
   	while (gidx>=0 && gdata->gfs[gidx]->end>=t->start) {
   		GffObj& g = *(gdata->gfs[gidx]);
-  		//find an overlappin gene object for this transcript
-  		if (g.isGene() && t->strand==g.strand && exonOverlap2Gene(t, g)) {
+  		//find an container gene object for this transcript
+  		//if (g.isGene() && t->strand==g.strand && exonOverlap2Gene(t, g)) {
+  		if (g.isGene() && t->strand==g.strand && g.exons.Count()==0
+  				  && t->start>=g.start && t->end<=g.end) {
   			if (g.children.IndexOf(t)<0)
   				g.children.Add(t);
   			keep=true;

@@ -14,6 +14,6 @@ make release
 cp gffread $linpack/
 tar cvfz $linpack.tar.gz $linpack
 ls -l $linpack.tar.gz
-echo "If you're on igmN machines you can also update the web files:"
+echo "On the salzX servers the web files can be updated like this:"
 echo "cp $linpack.tar.gz $pack.tar.gz  ~/html/software/stringtie/dl/"
 echo "perl -i -pe 's/gffread\-\d\.\d+\.\d+\w?\./gffread-$ver./g' ~/html/software/stringtie/gff.shtml"
