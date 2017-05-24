@@ -353,7 +353,7 @@ bool process_transcript(GFastaDb& gfasta, GffObj& gffrec) {
        isoCounter.Add(gname,isonum);
        }
       else (*isonum)++;
-   defline.appendfmt(" gene=%s", gname);
+   //defline.appendfmt(" gene=%s", gname);
    }
   int seqlen=0;
 
@@ -408,6 +408,7 @@ bool process_transcript(GFastaDb& gfasta, GffObj& gffrec) {
   bool trprint=true;
   int stopCodonAdjust=0;
   int mCDphase=0;
+  bool fullCDS=false;
   bool hasStop=false;
   if (gffrec.CDphase=='1' || gffrec.CDphase=='2')
       mCDphase = gffrec.CDphase-'0';
@@ -467,17 +468,18 @@ bool process_transcript(GFastaDb& gfasta, GffObj& gffrec) {
               }
            if (verbose) GMessage("In-frame STOP found for '%s'\n",gffrec.getID());
            } //has in-frame STOP
-         if (fullCDSonly) {
-             if (!hasStop || cdsaa[0]!='M') trprint=false;
-             }
+         fullCDS=(hasStop && cdsaa[0]!='M');
+         if (!fullCDS) gffrec.addAttr("partial", "true");
+         if (trprint && fullCDSonly && !fullCDS)
+        	 trprint=false;
          } // CDS check requested
       } //has CDS
-    } //translation or codon check/output was requested
+    } //translation or codon check was requested
   if (!trprint) {
     GFREE(cdsnt);
     GFREE(cdsaa);
     return false;
-    }
+  }
   if (stopCodonAdjust>0 && !hasStop) {
           //restore stop codon location
           adjust_stopcodon(gffrec, -stopCodonAdjust, &seglst);
@@ -495,13 +497,15 @@ bool process_transcript(GFastaDb& gfasta, GffObj& gffrec) {
            }
          if (fullattr && gffrec.attrs!=NULL) {
              //append all attributes found for each transcripts
-              for (int i=0;i<gffrec.attrs->Count();i++) {
-                defline.append(" ");
-                defline.append(gffrec.getAttrName(i));
-                defline.append("=");
-                defline.append(gffrec.getAttrValue(i));
-                }
-              }
+            for (int i=0;i<gffrec.attrs->Count();i++) {
+              defline.append(" ");
+              defline.append(gffrec.getAttrName(i));
+              defline.append("=");
+              defline.append(gffrec.getAttrValue(i));
+            }
+         } else if (!fullCDS) {
+            defline.append(" [partial]");
+         }
          if (aalen>0) {
            if (cdsaa[aalen-1]=='.') --aalen;
            printFasta(f_y, defline, cdsaa, aalen);
