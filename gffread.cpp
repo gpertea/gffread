@@ -269,7 +269,6 @@ int adjust_stopcodon(GffObj& gffrec, int adj, GList<GSeg>* seglst=NULL) {
   int realadj=0;
   if (gffrec.strand=='-') {
        if ((int)gffrec.CDstart>adj) {
-
            gffrec.CDstart-=adj;
            realadj=adj;
            if (adj<0) { //restore
@@ -416,10 +415,10 @@ bool process_transcript(GFastaDb& gfasta, GffObj& gffrec) {
     if (faseq==NULL) GError("Error: no genomic sequence provided!\n");
     //if (protmap && fullCDSonly) {
     //if (protmap && (fullCDSonly ||  (gffrec.qlen>0 && gffrec.qend==gffrec.qlen))) {
-    
     if (validCDSonly) { //make sure the stop codon is always included 
       //adjust_stopcodon(gffrec,3);
-      stopCodonAdjust=adjust_stopcodon(gffrec,3);
+      if (gffrec.strand=='-' || faseq->getseqlen()>(int)(gffrec.CDend+3))
+         stopCodonAdjust=adjust_stopcodon(gffrec, 3, NULL);
       }
     int strandNum=0;
     int phaseNum=0;
@@ -503,8 +502,11 @@ bool process_transcript(GFastaDb& gfasta, GffObj& gffrec) {
                 defline.append(gffrec.getAttrValue(i));
                 }
               }
-         printFasta(f_y, defline, cdsaa, aalen);
+         if (aalen>0) {
+           if (cdsaa[aalen-1]=='.') --aalen;
+           printFasta(f_y, defline, cdsaa, aalen);
          }
+   }
    if (f_x!=NULL) { //CDS only
          if (writeExonSegs) {
               defline.append(" loc:");
