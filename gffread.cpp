@@ -409,7 +409,7 @@ bool process_transcript(GFastaDb& gfasta, GffObj& gffrec) {
   int stopCodonAdjust=0;
   int mCDphase=0;
   bool fullCDS=false;
-  bool hasStop=false;
+  bool endStop=false;
   if (gffrec.CDphase=='1' || gffrec.CDphase=='2')
       mCDphase = gffrec.CDphase-'0';
   if (f_y!=NULL || f_x!=NULL || validCDSonly) {
@@ -430,11 +430,11 @@ bool process_transcript(GFastaDb& gfasta, GffObj& gffrec) {
       if (validCDSonly) {
          cdsaa=translateDNA(cdsnt, aalen, seqlen);
          char* p=strchr(cdsaa,'.');
-         hasStop=false;
+         endStop=false;
          if (p!=NULL) {
               if (p-cdsaa>=aalen-2) { //stop found as the last codon
                       *p='0';//remove it
-                      hasStop=true;
+                      endStop=true;
                       if (aalen-2==p-cdsaa) {
                         //previous to last codon is the stop codon
                         //so correct the CDS stop accordingly
@@ -448,7 +448,7 @@ bool process_transcript(GFastaDb& gfasta, GffObj& gffrec) {
                    else {//stop found before the last codon
                       trprint=false;
                       }
-              }//stop codon found
+         }//stop codon found
          if (trprint==false) { //failed CDS validity check
            //in-frame stop codon found
            if (altPhases && phaseNum<3) {
@@ -468,7 +468,7 @@ bool process_transcript(GFastaDb& gfasta, GffObj& gffrec) {
               }
            if (verbose) GMessage("In-frame STOP found for '%s'\n",gffrec.getID());
            } //has in-frame STOP
-         fullCDS=(hasStop && cdsaa[0]!='M');
+         fullCDS=(endStop && cdsaa[0]=='M');
          if (!fullCDS) gffrec.addAttr("partial", "true");
          if (trprint && fullCDSonly && !fullCDS)
         	 trprint=false;
@@ -480,7 +480,7 @@ bool process_transcript(GFastaDb& gfasta, GffObj& gffrec) {
     GFREE(cdsaa);
     return false;
   }
-  if (stopCodonAdjust>0 && !hasStop) {
+  if (stopCodonAdjust>0 && !endStop) {
           //restore stop codon location
           adjust_stopcodon(gffrec, -stopCodonAdjust, &seglst);
           if (cdsnt!=NULL && seqlen>0) {
@@ -503,7 +503,8 @@ bool process_transcript(GFastaDb& gfasta, GffObj& gffrec) {
               defline.append("=");
               defline.append(gffrec.getAttrValue(i));
             }
-         } else if (!fullCDS) {
+         }
+         if (validCDSonly && !fullattr && !fullCDS) {
             defline.append(" [partial]");
          }
          if (aalen>0) {
