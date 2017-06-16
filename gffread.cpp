@@ -1,6 +1,7 @@
 #include "GArgs.h"
 #include "gff_utils.h"
 #include <ctype.h>
+#include <inttypes.h>
 
 #define VERSION "0.9.9"
 
@@ -124,6 +125,7 @@ bool validCDSonly=false; // translation with no in-frame STOP
 bool bothStrands=false; //for single-exon mRNA validation, check the other strand too
 bool altPhases=false; //if original phase fails translation validation,
                      //try the other 2 phases until one makes it
+bool covInfo=false; // --cov-info option -- report genome coverage per strand
 bool mRNAOnly=true;
 bool NoPseudo=false;
 bool forceExons=false;
@@ -709,7 +711,7 @@ void printGffObj(FILE* f, GffObj* gfo, GStr& locname, GffPrintMode exonPrinting,
 
 int main(int argc, char * const argv[]) {
  GArgs args(argc, argv, 
-   "version;debug;merge;cluster-only;help;force-exons;no-pseudo;MINCOV=MINPID=hvOUNHWCVJMKQNSXTDAPRZFGLEm:g:i:r:s:t:a:b:o:w:x:y:d:");
+   "version;debug;merge;cluster-only;cov-info;help;force-exons;no-pseudo;MINCOV=MINPID=hvOUNHWCVJMKQNSXTDAPRZFGLEm:g:i:r:s:t:a:b:o:w:x:y:d:");
  args.printError(USAGE, true);
  if (args.getOpt('h') || args.getOpt("help")) {
     GMessage("%s",USAGE);
@@ -751,7 +753,9 @@ int main(int argc, char * const argv[]) {
       GMessage("Error: -K or -Q options have no effect with --cluster-only.\n");
       exit(1);
       }
-    }
+ }
+ covInfo=(args.getOpt("cov-info"));
+ if (covInfo) doCluster=true;
  if (fullCDSonly) validCDSonly=true;
  if (verbose) { 
      fprintf(stderr, "Command line was:\n");
@@ -888,11 +892,25 @@ int main(int argc, char * const argv[]) {
    gffloader.noPseudo=NoPseudo;
    gffloader.load(g_data, &validateGffRec, doCluster, doCollapseRedundant, 
                              matchAllIntrons, fuzzSpan, forceExons);
-   if (doCluster) 
-     collectLocusData(g_data);
+   if (doCluster)
+     collectLocusData(g_data, covInfo);
    if (numfiles==0) break;
    }
-   
+ if (covInfo) {
+	 //report coverage info at STDOUT
+	 uint64 f_bases=0;
+	 uint64 r_bases=0;
+	 uint64 u_bases=0;
+	 for (int g=0;g<g_data.Count();g++) {
+		 f_bases+=g_data[g]->f_bases;
+		 r_bases+=g_data[g]->r_bases;
+		 u_bases+=g_data[g]->u_bases;
+	 }
+	 fprintf(stdout, "Total bases covered by transcripts:\n");
+	 fprintf(stdout, "\t%" PRIu64 " on + strand\n", f_bases);
+	 fprintf(stdout, "\t%" PRIu64 " on - strand\n", r_bases);
+	 fprintf(stdout, "\t%" PRIu64 " on . strand\n", u_bases);
+ }
  GStr loctrack("gffcl");
  if (tracklabel) loctrack=tracklabel;
  g_data.setSorted(&gseqCmpName);

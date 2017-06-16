@@ -560,9 +560,12 @@ class GenomicSeqData {
   GList<GffObj> rnas; //all transcripts on this genomic sequence
   GList<GffLocus> loci; //all loci clusters
   GList<GTData> tdata; //transcript data (uptr holder for all rnas loaded here)
+  uint64 f_bases;//base coverage on forward strand
+  uint64 r_bases;//base coverage on reverse strand
+  uint64 u_bases;//base coverage on undetermined strand
   //GenomicSeqData(int gid=-1):rnas(true,true,false),loci(true,true,true),
   GenomicSeqData(int gid=-1):gfs(true, true, false),rnas((GCompareProc*)gfo_cmpByLoc),loci(true,true,false),
-       tdata(false,true,false) {
+       tdata(false,true,false),  f_bases(0), r_bases(0), u_bases(0) {
   gseq_id=gid;
   if (gseq_id>=0) 
     gseq_name=GffObj::names->gseqs.getName(gseq_id);
@@ -693,6 +696,6 @@ GffObj* redundantTranscripts(GffObj& ti, GffObj&  tj, bool matchAllIntrons=true,
 
 //void loadGFF(FILE* f, GList<GenomicSeqData>& seqdata, const char* fname);
 
-void collectLocusData(GList<GenomicSeqData>& ref_data);
+void collectLocusData(GList<GenomicSeqData>& ref_data, bool covInfo=false);
 
 #endif

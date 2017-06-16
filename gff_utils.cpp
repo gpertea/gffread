@@ -515,12 +515,21 @@ bool GffLoader::placeGf(GffObj* t, GenomicSeqData* gdata, bool doCluster, bool c
   return true;
 }
 
-void collectLocusData(GList<GenomicSeqData>& ref_data) {
+void collectLocusData(GList<GenomicSeqData>& ref_data, bool covInfo) {
 	int locus_num=0;
 	for (int g=0;g<ref_data.Count();g++) {
 		GenomicSeqData* gdata=ref_data[g];
 		for (int l=0;l<gdata->loci.Count();l++) {
 			GffLocus& loc=*(gdata->loci[l]);
+			if (covInfo) {
+				for (int m=0;m<loc.mexons.Count();m++) {
+					if (loc.strand=='+')
+						gdata->f_bases+=loc.mexons[m].len();
+					else if (loc.strand=='-')
+						gdata->r_bases+=loc.mexons[m].len();
+					else gdata->u_bases+=loc.mexons[m].len();
+				}
+			}
 			GHash<int> gnames(true); //gene names in this locus
 			GHash<int> geneids(true); //Entrez GeneID: numbers
 			for (int i=0;i<loc.rnas.Count();i++) {
