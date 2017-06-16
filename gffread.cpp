@@ -1,6 +1,7 @@
 #include "GArgs.h"
 #include "gff_utils.h"
 #include <ctype.h>
+#define __STDC_FORMAT_MACROS
 #include <inttypes.h>
 
 #define VERSION "0.9.9"
