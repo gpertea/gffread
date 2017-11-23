@@ -45,7 +45,7 @@ gffread <input_gff> [-g <genomic_seqs_fasta> | <dir>][-s <seq_info.fsize>] \n\
       splice site consensus (i.e. not GT-AG, GC-AG or AT-AC)\n\
   -J  discard any mRNAs that either lack initial START codon\n\
       or the terminal STOP codon, or have an in-frame stop codon\n\
-      (only print mRNAs with a fulll, valid CDS)\n\
+      (only print mRNAs with a full, valid CDS)\n\
   --no-pseudo: filter out records matching the 'pseudo' keyword\n\
  \n\
   -M/--merge : cluster the input transcripts into loci, collapsing matching\n\
@@ -79,7 +79,7 @@ gffread <input_gff> [-g <genomic_seqs_fasta> | <dir>][-s <seq_info.fsize>] \n\
       (use -o- for printing to stdout)\n\
   -t  use <trackname> in the second column of each GFF output line\n\
   -T  -o option will output GTF format instead of GFF3\n\
- "
+"
 
 
 class SeqInfo { //populated from the -s option of gffread
@@ -677,7 +677,7 @@ bool validateGffRec(GffObj* gffrec, GList<GffObj>* gfnew) {
 
 int main(int argc, char * const argv[]) {
  GArgs args(argc, argv, 
-   "debug;merge;cluster-only;help;force-exons;no-pseudo;MINCOV=MINPID=hvOUNHWCVJMKQNSXTDAPRZFGLEm:g:i:r:s:t:a:b:o:w:x:y:d:");
+   "debug;merge;cluster-only;help;force-exons;no-pseudo;MINCOV=MINPID=hvOUNHWCVJMKQTDARZFGLEm:g:i:r:s:t:o:w:x:y:d:");
  args.printError(USAGE, true);
  if (args.getOpt('h') || args.getOpt("help")) {
     GMessage("%s",USAGE);
