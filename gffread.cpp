@@ -102,6 +102,106 @@ class SeqInfo { //populated from the -s option of gffread
    }
 };
 
+struct CStopAdjData {
+	int gseqlen;
+	GffObj* t;
+	int CDS_shift;
+	int exon_shift;
+	CStopAdjData(uint glen=0, GffObj* gfo=NULL):gseqlen(glen), t(gfo),
+		CDS_shift(0), exon_shift(0) {
+
+	}
+
+	int apply(int cdshift, bool reset=false) {
+		if (cdshift==0) {
+			if (reset) {
+				CDS_shift=0;
+				exon_shift=0;
+			}
+			return 0;
+		}
+		if (t->strand=='-') {
+		  if (cdshift>0 && (int)t->CDstart>cdshift) {
+			  CDS_shift+=cdshift;
+			  t->CDstart-=cdshift;
+			  if (t->exons.First()->start>t->CDstart) {
+				  int eshift=t->exons.First()->start-t->CDstart;
+				  exon_shift+=eshift;
+				  t->exons.First()->start-=eshift;
+				  t->start-=eshift;
+				  t->covlen+=eshift;
+			  }
+		  }
+		  else if (cdshift<0) { //shrinking CDS
+			   //only used in order to undo a previous expansion
+               CDS_shift+=cdshift;
+               t->CDstart-=cdshift;
+               if (exon_shift>0) { //undo previous expansion
+            	   int eshift=-exon_shift;
+            	   t->exons.First()->start-=eshift;
+            	   t->start-=eshift;
+            	   t->covlen+=eshift;
+            	   exon_shift=0;
+               }
+		  }
+		}
+		else { //forward strand
+		  if (cdshift>0 && (int)t->CDend+cdshift<=gseqlen) {
+			  CDS_shift+=cdshift;
+			  t->CDend+=cdshift;
+			  if (t->exons.Last()->end<t->CDend) {
+				  int eshift=t->CDend-t->exons.Last()->end;
+				  exon_shift+=eshift;
+				  t->exons.Last()->end+=eshift;
+				  t->end+=eshift;
+				  t->covlen+=eshift;
+			  }
+
+		  }
+		  else if (cdshift<0) { //shrinking CDS
+              CDS_shift+=cdshift;
+              t->CDend+=cdshift;
+              if (exon_shift>0) { //undo previous expansion
+           	   int eshift=-exon_shift;
+           	   t->exons.Last()->end+=eshift;
+           	   t->end+=eshift;
+           	   t->covlen+=eshift;
+           	   exon_shift=0;
+              }
+		  }
+		}
+
+		if (reset) {
+			CDS_shift=0;
+			exon_shift=0;
+		}
+		return CDS_shift;
+	}
+
+	int restore() {
+      if (CDS_shift==0) return 0;
+      int r=CDS_shift;
+	  if (t->strand=='-') {
+		  t->CDstart+=CDS_shift;
+		  if (exon_shift!=0) {
+			t->exons.First()->start+=exon_shift;
+			t->covlen-=exon_shift;
+			t->start+=exon_shift;
+		  }
+	  } else {
+		  t->CDend-=CDS_shift;
+		  if (exon_shift!=0) {
+			t->exons.Last()->end-=exon_shift;
+			t->covlen-=exon_shift;
+			t->end+=exon_shift;
+		  }
+	   }
+	  CDS_shift=0;
+	  exon_shift=0;
+      return r;
+	}
+};
+
 class RefTran {
  public:
    char* new_name;
@@ -268,29 +368,22 @@ GFaSeqGet* fastaSeqGet(GFastaDb& gfasta, GffObj& gffrec) {
 
 
 int adjust_stopcodon(GffObj& gffrec, int adj, GList<GSeg>* seglst=NULL) {
- //adj>0 => extedn CDS,  adj<0 => shrink CDS
- //when CDS is expanded, exons have to be checked too and 
- // expanded accordingly if they had the same boundary
+  //adj>0, extend CDS to include a potential stop codon
+  //when CDS is expanded, the terminal exon might have to be adjusted too
   int realadj=0;
   if (gffrec.strand=='-') {
        if ((int)gffrec.CDstart>adj) {
            gffrec.CDstart-=adj;
            realadj=adj;
-           if (adj<0) { //restore
-              if (gffrec.exons.First()->start==gffrec.CDstart+adj) {
-                 gffrec.exons.First()->start-=adj;
-                 gffrec.start=gffrec.exons.First()->start;
-                 gffrec.covlen+=adj;
-                 }
-              }
-           else if (gffrec.exons.First()->start>=gffrec.CDstart) {
-                 gffrec.exons.First()->start-=adj;
-                 gffrec.start=gffrec.exons.First()->start;
-                 gffrec.covlen+=adj;
+           if (gffrec.exons.First()->start>gffrec.CDstart) {
+                 gffrec.covlen+=gffrec.exons.First()->start - gffrec.CDstart;
+                 gffrec.exons.First()->start=gffrec.CDstart;
+                 gffrec.start=gffrec.CDstart;
                  }
              }
           }
-        else {
+        else { // forward strand
+         //expand beyond
          realadj=adj;
          gffrec.CDend+=adj;
          if (adj<0) {//restore
@@ -299,14 +392,14 @@ int adjust_stopcodon(GffObj& gffrec, int adj, GList<GSeg>* seglst=NULL) {
                         gffrec.end=gffrec.exons.Last()->end;
                         gffrec.covlen+=adj;
                         }
-          }
-         else if (gffrec.exons.Last()->end<=gffrec.CDend) {
-             gffrec.exons.Last()->end+=adj;
-             gffrec.end=gffrec.exons.Last()->end;
-             gffrec.covlen+=adj;
+         }
+         else if (gffrec.exons.Last()->end<gffrec.CDend) {
+             gffrec.covlen+=gffrec.CDend-gffrec.exons.Last()->end;
+             gffrec.exons.Last()->end=gffrec.CDend;
+             gffrec.end=gffrec.CDend;
              }
          }
-  if (seglst!=NULL) seglst->Last()->end+=adj;
+  if (seglst!=NULL) seglst->Last()->end+=realadj;
   return realadj;
  }
 
@@ -411,21 +504,18 @@ bool process_transcript(GFastaDb& gfasta, GffObj& gffrec) {
     }
 
   bool trprint=true;
-  int stopCodonAdjust=0;
+  //int stopCodonAdjust=0;
   int mCDphase=0;
   bool fullCDS=false;
   bool endStop=false;
   if (gffrec.CDphase=='1' || gffrec.CDphase=='2')
       mCDphase = gffrec.CDphase-'0';
+  CStopAdjData adjstop(faseq->getseqlen(), &gffrec);
   if (f_y!=NULL || f_x!=NULL || validCDSonly) {
     if (faseq==NULL) GError("Error: no genomic sequence provided!\n");
-    //if (protmap && fullCDSonly) {
-    //if (protmap && (fullCDSonly ||  (gffrec.qlen>0 && gffrec.qend==gffrec.qlen))) {
-    if (validCDSonly) { //make sure the stop codon is always included 
-      //adjust_stopcodon(gffrec,3);
-      if (gffrec.strand=='-' || faseq->getseqlen()>(int)(gffrec.CDend+3))
-         stopCodonAdjust=adjust_stopcodon(gffrec, 3, NULL);
-      }
+    if (validCDSonly) { //make sure we fetch the extra codon at the end, if available
+      adjstop.apply(3);
+    }
     int strandNum=0;
     int phaseNum=0;
   CDS_CHECK:
@@ -437,22 +527,27 @@ bool process_transcript(GFastaDb& gfasta, GffObj& gffrec) {
          char* p=strchr(cdsaa,'.');
          endStop=false;
          if (p!=NULL) {
-              if (p-cdsaa>=aalen-2) { //stop found as the last codon
-                      *p='0';//remove it
-                      endStop=true;
-                      if (aalen-2==p-cdsaa) {
-                        //previous to last codon is the stop codon
-                        //so correct the CDS stop accordingly
-                        adjust_stopcodon(gffrec,-3, &seglst);
-                        stopCodonAdjust=0; //clear artificial stop adjustment
-                        seqlen-=3;
-                        cdsnt[seqlen]=0;
-                        }
-                      aalen=p-cdsaa;
-                      }
-                   else {//stop found before the last codon
-                      trprint=false;
-                      }
+              if (p-cdsaa>=aalen-2) { //stop found as the last or prev-to-last codon
+                  *p='\0';//remove it
+                  endStop=true;
+                  if (aalen-2==p-cdsaa) {
+                    //previous to last codon is the stop codon
+                    //so correct the CDS stop accordingly
+                    adjstop.apply(-3, true);
+                    if (seglst.Count()>0) seglst.Last()->end-=3;
+                    //stopCodonAdjust=0; //clear artificial stop adjustment
+                    seqlen-=3;
+                    cdsnt[seqlen]=0;
+                  }
+                  else {
+                	 //last codon is a stop codon
+                	 adjstop.apply(0, true);
+                  }
+                  aalen=p-cdsaa;
+              }
+              else {//stop found before the last codon
+                  trprint=false;
+              }
          }//stop codon found
          if (trprint==false) { //failed CDS validity check
            //in-frame stop codon found
@@ -485,18 +580,21 @@ bool process_transcript(GFastaDb& gfasta, GffObj& gffrec) {
     GFREE(cdsaa);
     return false;
   }
-  if (stopCodonAdjust>0 && !endStop) {
-          //restore stop codon location
-          adjust_stopcodon(gffrec, -stopCodonAdjust, &seglst);
-          if (cdsnt!=NULL && seqlen>0) {
-             seqlen-=stopCodonAdjust;
-             cdsnt[seqlen]=0;
-             }
-          if (cdsaa!=NULL) aalen--;
-          }
+  if (validCDSonly) {
+     int stopCodonAdjust=adjstop.restore();
+     if (stopCodonAdjust!=0 && !endStop) {
+        //restore stop codon location
+        //adjust_stopcodon(gffrec, -stopCodonAdjust, &seglst);
+	    if (seglst.Count()>0) seglst.Last()->end-=stopCodonAdjust;
+        if (cdsnt!=NULL && seqlen>0) {
+           seqlen-=stopCodonAdjust;
+           cdsnt[seqlen]=0;
+        }
+        if (cdsaa!=NULL) aalen--;
+     }
+  }
 
   if (f_y!=NULL) { //CDS translation fasta output requested
-         //char* 
          if (cdsaa==NULL) { //translate now if not done before
            cdsaa=translateDNA(cdsnt, aalen, seqlen);
            }
