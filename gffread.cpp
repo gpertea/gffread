@@ -510,15 +510,17 @@ bool process_transcript(GFastaDb& gfasta, GffObj& gffrec) {
   bool endStop=false;
   if (gffrec.CDphase=='1' || gffrec.CDphase=='2')
       mCDphase = gffrec.CDphase-'0';
-  CStopAdjData* adjstop=NULL;
+  //CStopAdjData* adjstop=NULL;
   if (f_y!=NULL || f_x!=NULL || validCDSonly) {
     if (faseq==NULL) GError("Error: no genomic sequence provided!\n");
+    /*
     adjstop=new CStopAdjData(faseq->getseqlen(), &gffrec);
     if (validCDSonly) {
       //STOP codon should be included in the CDS, so just in case it wasn't
       //we make sure to fetch an additional end codon if available
       adjstop->apply(3);
     }
+    */
     int strandNum=0;
     int phaseNum=0;
   CDS_CHECK:
@@ -530,13 +532,16 @@ bool process_transcript(GFastaDb& gfasta, GffObj& gffrec) {
          char* p=strchr(cdsaa,'.');
          endStop=false;
          if (p!=NULL) {
-              if (p-cdsaa>=aalen-2) { //stop found as the last or prev-to-last codon
+              //if (p-cdsaa>=aalen-2) { //stop found as the last OR prev-to-last codon
+        	 if (p-cdsaa==aalen-1) { //stop found as the last codon
                   *p='\0';//remove it
                   endStop=true;
-                  if (aalen-2==p-cdsaa) {
+                  aalen--;
+                  /*
+                  if (p-cdsaa==aalen-2) {
                     //previous to last codon is the stop codon
                     //so correct the CDS stop accordingly
-                    adjstop->apply(-3, true);
+                    //adjstop->apply(-3, true);
                     if (seglst.Count()>0) seglst.Last()->end-=3;
                     //stopCodonAdjust=0; //clear artificial stop adjustment
                     seqlen-=3;
@@ -547,8 +552,9 @@ bool process_transcript(GFastaDb& gfasta, GffObj& gffrec) {
                 	 adjstop->apply(0, true);
                   }
                   aalen=p-cdsaa;
+                  */
               }
-              else {//stop found before the last codon
+              else {//stop found before the last codon - not valid
                   trprint=false;
               }
          }//stop codon found
@@ -581,9 +587,10 @@ bool process_transcript(GFastaDb& gfasta, GffObj& gffrec) {
   if (!trprint) {
     GFREE(cdsnt);
     GFREE(cdsaa);
-    if (adjstop!=NULL) delete adjstop;
+    //if (adjstop!=NULL) delete adjstop;
     return false;
   }
+  /*
   if (validCDSonly) {
      int stopCodonAdjust=adjstop->restore();
      if (stopCodonAdjust!=0 && !endStop) {
@@ -598,6 +605,7 @@ bool process_transcript(GFastaDb& gfasta, GffObj& gffrec) {
      }
   }
   if (adjstop!=NULL) delete adjstop;
+  */
   if (f_y!=NULL) { //CDS translation fasta output requested
          if (cdsaa==NULL) { //translate now if not done before
            cdsaa=translateDNA(cdsnt, aalen, seqlen);
