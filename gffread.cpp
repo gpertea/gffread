@@ -4,7 +4,7 @@
 #define __STDC_FORMAT_MACROS
 #include <inttypes.h>
 
-#define VERSION "0.9.9"
+#define VERSION "0.9.10"
 
 #define USAGE "gffread v" VERSION ". Usage:\n\
 gffread <input_gff> [-g <genomic_seqs_fasta> | <dir>][-s <seq_info.fsize>] \n\
@@ -510,11 +510,14 @@ bool process_transcript(GFastaDb& gfasta, GffObj& gffrec) {
   bool endStop=false;
   if (gffrec.CDphase=='1' || gffrec.CDphase=='2')
       mCDphase = gffrec.CDphase-'0';
-  CStopAdjData adjstop(faseq->getseqlen(), &gffrec);
+  CStopAdjData* adjstop=NULL;
   if (f_y!=NULL || f_x!=NULL || validCDSonly) {
     if (faseq==NULL) GError("Error: no genomic sequence provided!\n");
-    if (validCDSonly) { //make sure we fetch the extra codon at the end, if available
-      adjstop.apply(3);
+    adjstop=new CStopAdjData(faseq->getseqlen(), &gffrec);
+    if (validCDSonly) {
+      //STOP codon should be included in the CDS, so just in case it wasn't
+      //we make sure to fetch an additional end codon if available
+      adjstop->apply(3);
     }
     int strandNum=0;
     int phaseNum=0;
@@ -533,7 +536,7 @@ bool process_transcript(GFastaDb& gfasta, GffObj& gffrec) {
                   if (aalen-2==p-cdsaa) {
                     //previous to last codon is the stop codon
                     //so correct the CDS stop accordingly
-                    adjstop.apply(-3, true);
+                    adjstop->apply(-3, true);
                     if (seglst.Count()>0) seglst.Last()->end-=3;
                     //stopCodonAdjust=0; //clear artificial stop adjustment
                     seqlen-=3;
@@ -541,7 +544,7 @@ bool process_transcript(GFastaDb& gfasta, GffObj& gffrec) {
                   }
                   else {
                 	 //last codon is a stop codon
-                	 adjstop.apply(0, true);
+                	 adjstop->apply(0, true);
                   }
                   aalen=p-cdsaa;
               }
@@ -578,10 +581,11 @@ bool process_transcript(GFastaDb& gfasta, GffObj& gffrec) {
   if (!trprint) {
     GFREE(cdsnt);
     GFREE(cdsaa);
+    if (adjstop!=NULL) delete adjstop;
     return false;
   }
   if (validCDSonly) {
-     int stopCodonAdjust=adjstop.restore();
+     int stopCodonAdjust=adjstop->restore();
      if (stopCodonAdjust!=0 && !endStop) {
         //restore stop codon location
         //adjust_stopcodon(gffrec, -stopCodonAdjust, &seglst);
@@ -593,7 +597,7 @@ bool process_transcript(GFastaDb& gfasta, GffObj& gffrec) {
         if (cdsaa!=NULL) aalen--;
      }
   }
-
+  if (adjstop!=NULL) delete adjstop;
   if (f_y!=NULL) { //CDS translation fasta output requested
          if (cdsaa==NULL) { //translate now if not done before
            cdsaa=translateDNA(cdsnt, aalen, seqlen);
