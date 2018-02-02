@@ -626,6 +626,7 @@ void GffLoader::load(GList<GenomicSeqData>& seqdata, GFValidateFunc* gf_validate
 	GffReader* gffr=new GffReader(f, this->transcriptsOnly, false); //not only mRNA features, not sorted
 	gffr->showWarnings(this->showWarnings);
 	//           keepAttrs   mergeCloseExons  noExonAttr
+	gffr->set_gene2exon(gene2exon);
 	gffr->readAll(this->fullAttributes,    this->mergeCloseExons,  this->noExonAttrs);
 	GVec<int> pseudoAttrIds;
 	GVec<int> pseudoFeatureIds;

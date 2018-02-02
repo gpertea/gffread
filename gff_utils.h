@@ -647,6 +647,7 @@ struct GffLoader {
   GStr fname;
   FILE* f;
   bool transcriptsOnly;
+  bool gene2exon;
   bool fullAttributes;
   bool noExonAttrs;
   bool mergeCloseExons;
@@ -660,6 +661,7 @@ struct GffLoader {
   GffLoader(const char* filename):fname(filename) {
       f=NULL;
       transcriptsOnly=true;
+      gene2exon=false;
       fullAttributes=false;
       noExonAttrs=false;
       mergeCloseExons=false;
@@ -675,12 +677,6 @@ struct GffLoader {
             }
           }
       }
-  /*
-  //GffReader will take care of this
-  ~GffLoader() {
-      if (f!=NULL && f!=stdin) fclose(f);
-      }
-  */
 };
 
 void printFasta(FILE* f, GStr& defline, char* seq, int seqlen=-1);

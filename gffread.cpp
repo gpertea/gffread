@@ -4,7 +4,7 @@
 #define __STDC_FORMAT_MACROS
 #include <inttypes.h>
 
-#define VERSION "0.9.10"
+#define VERSION "0.9.11"
 
 #define USAGE "gffread v" VERSION ". Usage:\n\
 gffread <input_gff> [-g <genomic_seqs_fasta> | <dir>][-s <seq_info.fsize>] \n\
@@ -62,6 +62,8 @@ gffread <input_gff> [-g <genomic_seqs_fasta> | <dir>][-s <seq_info.fsize>] \n\
  \n\
  --force-exons: make sure that the lowest level GFF features are printed as \n\
        \"exon\" features\n\
+ --gene2exon: for single-line genes not parenting any transcripts, add an\n\
+       exon feature spanning the entire gene (treat as transcript)\n\
  -E    expose (warn about) duplicate transcript IDs and other potential \n\
        problems with the given GFF/GTF records\n\
  -D    decode url encoded characters within attributes\n\
@@ -824,7 +826,7 @@ void printGffObj(FILE* f, GffObj* gfo, GStr& locname, GffPrintMode exonPrinting,
 
 int main(int argc, char * const argv[]) {
  GArgs args(argc, argv, 
-   "version;debug;merge;bed;cluster-only;cov-info;help;force-exons;no-pseudo;MINCOV=MINPID=hvOUNHWCVJMKQTDARZFGLEBm:g:i:r:s:t:o:w:x:y:d:");
+   "version;debug;merge;bed;cluster-only;cov-info;help;force-exons;gene2exon;no-pseudo;MINCOV=MINPID=hvOUNHWCVJMKQTDARZFGLEBm:g:i:r:s:t:o:w:x:y:d:");
  args.printError(USAGE, true);
  if (args.getOpt('h') || args.getOpt("help")) {
     GMessage("%s",USAGE);
@@ -846,6 +848,7 @@ int main(int argc, char * const argv[]) {
  bothStrands=(args.getOpt('B')!=NULL);
  fullCDSonly=(args.getOpt('J')!=NULL);
  spliceCheck=(args.getOpt('N')!=NULL);
+ bool gene2exon=(args.getOpt("gene2exon")!=NULL);
  bool matchAllIntrons=(args.getOpt('K')==NULL);
  bool fuzzSpan=(args.getOpt('Q')!=NULL);
  if (args.getOpt('M') || args.getOpt("merge")) {
@@ -999,6 +1002,7 @@ int main(int argc, char * const argv[]) {
         else infile="-";
    GffLoader gffloader(infile.chars());
    gffloader.transcriptsOnly=mRNAOnly;
+   gffloader.gene2exon=gene2exon;
    gffloader.fullAttributes=fullattr;
    gffloader.noExonAttrs=noExonAttr;
    gffloader.mergeCloseExons=mergeCloseExons;
