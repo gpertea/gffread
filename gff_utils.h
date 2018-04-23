@@ -2,7 +2,6 @@
 #define GFF_UTILS_H
 #include "gff.h"
 #include "GStr.h"
-#include "GFastaIndex.h"
 #include "GFaSeqGet.h"
 
 extern bool debugMode;
@@ -92,123 +91,6 @@ class GeneInfo { //for Ensembl GTF conversion
      }
 };
 
-//genomic fasta sequence handling
-class GFastaDb {
- public:
-  char* fastaPath;
-  GFastaIndex* faIdx; //could be a cdb .cidx file
-  int last_fetchid;
-  GFaSeqGet* faseq;
-  //GCdbYank* gcdb;
-  char* getFastaFile(int gseq_id) {
-     if (fastaPath==NULL) return NULL;
-     GStr s(fastaPath);
-     s.trimR('/');
-     s.appendfmt("/%s",GffObj::names->gseqs.getName(gseq_id));
-     GStr sbase(s);
-     if (!fileExists(s.chars())) s.append(".fa");
-     if (!fileExists(s.chars())) s.append("sta");
-     if (fileExists(s.chars())) return Gstrdup(s.chars());
-         else {
-             GMessage("Warning: cannot find genomic sequence file %s{.fa,.fasta}\n",sbase.chars());
-             return NULL;
-             }
-     }
-
-   GFastaDb(const char* fpath=NULL) {
-     //gcdb=NULL;
-     fastaPath=NULL;
-     faseq=NULL;
-     faIdx=NULL;
-     init(fpath);
-     }
-
-   void init(const char* fpath) {
-     if (fpath==NULL || fpath[0]==0) return;
-     last_fetchid=-1;
-     if (!fileExists(fpath))
-       GError("Error: file/directory %s does not exist!\n",fpath);
-     fastaPath=Gstrdup(fpath);
-     GStr gseqpath(fpath);
-     if (fileExists(fastaPath)>1) { //exists and it's not a directory
-            GStr fainame(fastaPath);
-            if (fainame.rindex(".fai")==fainame.length()-4) {
-               //.fai index file given directly
-               fastaPath[fainame.length()-4]=0;
-               if (!fileExists(fastaPath))
-                  GError("Error: cannot find fasta file for index %s !\n", fastaPath);
-               }
-              else fainame.append(".fai");
-            //GMessage("creating GFastaIndex with fastaPath=%s, fainame=%s\n", fastaPath, fainame.chars());
-            faIdx=new GFastaIndex(fastaPath,fainame.chars());
-            GStr fainamecwd(fainame);
-            int ip=-1;
-            if ((ip=fainamecwd.rindex(CHPATHSEP))>=0)
-               fainamecwd.cut(0,ip+1);
-            if (!faIdx->hasIndex()) { //could not load index
-               //try current directory
-                  if (fainame!=fainamecwd) {
-                    if (fileExists(fainamecwd.chars())>1) {
-                       faIdx->loadIndex(fainamecwd.chars());
-                       }
-                    }
-                  } //tried to load index
-            if (!faIdx->hasIndex()) {
-                 GMessage("No fasta index found for %s. Rebuilding, please wait..\n",fastaPath);
-                 faIdx->buildIndex();
-                 if (faIdx->getCount()==0) GError("Error: no fasta records found!\n");
-                 GMessage("Fasta index rebuilt.\n");
-                 FILE* fcreate=fopen(fainame.chars(), "w");
-                 if (fcreate==NULL) {
-                   GMessage("Warning: cannot create fasta index %s! (permissions?)\n", fainame.chars());
-                   if (fainame!=fainamecwd) fcreate=fopen(fainamecwd.chars(), "w");
-                   if (fcreate==NULL)
-                      GError("Error: cannot create fasta index %s!\n", fainamecwd.chars());
-                   }
-                 if (faIdx->storeIndex(fcreate)<faIdx->getCount())
-                     GMessage("Warning: error writing the index file!\n");
-                 } //index created and attempted to store it
-            } //multi-fasta
-     }
-   GFaSeqGet* fetch(int gseq_id, bool checkFasta=false) {
-     if (fastaPath==NULL) return NULL;
-     if (gseq_id==last_fetchid && faseq!=NULL) return faseq;
-     delete faseq;
-     faseq=NULL;
-     last_fetchid=-1;
-     char* gseqname=GffObj::names->gseqs.getName(gseq_id);
-     if (faIdx!=NULL) { //fastaPath was the multi-fasta file name
-        GFastaRec* farec=faIdx->getRecord(gseqname);
-        if (farec!=NULL) {
-             faseq=new GFaSeqGet(fastaPath,farec->seqlen, farec->fpos,
-                               farec->line_len, farec->line_blen);
-             faseq->loadall(); //just cache the whole sequence, it's faster
-             last_fetchid=gseq_id;
-             }
-        else {
-          GMessage("Warning: couldn't find fasta record for '%s'!\n",gseqname);
-          return NULL;
-          }
-        }
-     else {
-         char* sfile=getFastaFile(gseq_id);
-         if (sfile!=NULL) {
-            faseq=new GFaSeqGet(sfile,checkFasta);
-            faseq->loadall();
-            last_fetchid=gseq_id;
-            GFREE(sfile);
-            }
-         } //one fasta file per contig
-       return faseq;
-     }
-
-   ~GFastaDb() {
-     GFREE(fastaPath);
-     //delete gcdb;
-     delete faIdx;
-     delete faseq;
-     }
-};
 
 class GffLocus;
 

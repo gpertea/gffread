@@ -4,7 +4,7 @@
 #define __STDC_FORMAT_MACROS
 #include <inttypes.h>
 
-#define VERSION "0.9.12"
+#define VERSION "0.9.13"
 
 #define USAGE "gffread v" VERSION ". Usage:\n\
 gffread <input_gff> [-g <genomic_seqs_fasta> | <dir>][-s <seq_info.fsize>] \n\
@@ -363,12 +363,6 @@ char* getSeqName(char* seqid) {
   return charbuf;
 }
 
-GFaSeqGet* fastaSeqGet(GFastaDb& gfasta, GffObj& gffrec) {
-  if (gfasta.fastaPath==NULL) return NULL;
-  return gfasta.fetch(gffrec.gseq_id);
-}
-
-
 int adjust_stopcodon(GffObj& gffrec, int adj, GList<GSeg>* seglst=NULL) {
   //adj>0, extend CDS to include a potential stop codon
   //when CDS is expanded, the terminal exon might have to be adjusted too
@@ -473,7 +467,7 @@ bool process_transcript(GFastaDb& gfasta, GffObj& gffrec) {
          }
      }
   GList<GSeg> seglst(false,true);
-  GFaSeqGet* faseq=fastaSeqGet(gfasta, gffrec);
+  GFaSeqGet* faseq=fastaSeqGet(gfasta, gffrec.getGSeqName());
   if (spliceCheck && gffrec.exons.Count()>1) {
     //check introns for splice site consensi ( GT-AG, GC-AG or AT-AC )
     if (faseq==NULL) GError("Error: no genomic sequence available!\n");
