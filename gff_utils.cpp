@@ -4,7 +4,7 @@ extern bool verbose;
 
 //bool debugState=false;
 
-void printFasta(FILE* f, GStr& defline, char* seq, int seqlen) {
+void printFasta(FILE* f, GStr& defline, char* seq, int seqlen, bool useStar) {
  if (seq==NULL) return;
  int len=(seqlen>0)?seqlen:strlen(seq);
  if (len<=0) return;
@@ -16,7 +16,9 @@ void printFasta(FILE* f, GStr& defline, char* seq, int seqlen) {
      fputc('\n', f);
      ilen = 0;
      }
-   putc(seq[i], f);
+   if (useStar && seq[i]=='.')
+        putc('*', f);
+   else putc(seq[i], f);
    } //for
  fputc('\n', f);
 }

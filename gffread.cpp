@@ -4,7 +4,7 @@
 #define __STDC_FORMAT_MACROS
 #include <inttypes.h>
 
-#define VERSION "0.9.13"
+#define VERSION "0.10.1"
 
 #define USAGE "gffread v" VERSION ". Usage:\n\
 gffread <input_gff> [-g <genomic_seqs_fasta> | <dir>][-s <seq_info.fsize>] \n\
@@ -47,7 +47,7 @@ gffread <input_gff> [-g <genomic_seqs_fasta> | <dir>][-s <seq_info.fsize>] \n\
      splice site consensus (i.e. not GT-AG, GC-AG or AT-AC)\n\
  -J  discard any mRNAs that either lack initial START codon\n\
      or the terminal STOP codon, or have an in-frame stop codon\n\
-     (only print mRNAs with a full, valid CDS)\n\
+     (i.e. only print mRNAs with a complete CDS)\n\
  --no-pseudo: filter out records matching the 'pseudo' keyword\n\
  \n\
  -M/--merge : cluster the input transcripts into loci, collapsing matching\n\
@@ -73,6 +73,7 @@ gffread <input_gff> [-g <genomic_seqs_fasta> | <dir>][-s <seq_info.fsize>] \n\
  -W    for -w and -x options, also write for each fasta record the exon\n\
        coordinates projected onto the spliced sequence\n\
  -y    write a protein fasta file with the translation of CDS for each record\n\
+ -S    for -y option, use '*' instead of '.' as stop codon translation\n\
  -L    Ensembl GTF to GFF3 conversion (implies -F; should be used with -m)\n\
  -m    <chr_replace> is a reference (genomic) sequence replacement table with\n\
        this format:\n\
@@ -235,6 +236,8 @@ bool NoPseudo=false;
 bool forceExons=false;
 bool spliceCheck=false; //only known splice-sites
 bool decodeChars=false; //decode url-encoded chars in attrs (-D)
+bool StarStop=false; //use * instead of . for stop codon translation
+
 bool fullCDSonly=false; // starts with START, ends with STOP codon
 bool fullattr=false;
 //bool sortByLoc=false; // if the GFF output should be sorted by location
@@ -273,7 +276,7 @@ GList<GenomicSeqData> g_data(true,true,true); //list of GFF records by genomic s
 GHash<SeqInfo> seqinfo;
 GHash<int> isoCounter; //counts the valid isoforms
 GHash<RefTran> reftbl;
-GHash<GeneInfo> gene_ids; 
+GHash<GeneInfo> gene_ids;
   //min-max gene span associated to chr|gene_id (mostly for Ensembl conversion)
 
 bool debugMode=false;
@@ -426,7 +429,7 @@ bool process_transcript(GFastaDb& gfasta, GffObj& gffrec) {
       if (strcmp(biotype, "protein_coding")==0 || gffrec.hasCDS())
                 gffrec.setFeatureName("mRNA");
        else {
-          if (strcmp(biotype, "processed_transcript")==0) 
+          if (strcmp(biotype, "processed_transcript")==0)
               gffrec.setFeatureName("proc_RNA");
             else {
               //is_gene=endsWith(biotype, "gene");
@@ -619,8 +622,8 @@ bool process_transcript(GFastaDb& gfasta, GffObj& gffrec) {
             defline.append(" [partial]");
          }
          if (aalen>0) {
-           if (cdsaa[aalen-1]=='.') --aalen;
-           printFasta(f_y, defline, cdsaa, aalen);
+           if (cdsaa[aalen-1]=='.') --aalen; //avoid printing the final stop codon
+           printFasta(f_y, defline, cdsaa, aalen, StarStop);
          }
    }
    if (f_x!=NULL) { //CDS only
@@ -819,8 +822,8 @@ void printGffObj(FILE* f, GffObj* gfo, GStr& locname, GffPrintMode exonPrinting,
 
 
 int main(int argc, char * const argv[]) {
- GArgs args(argc, argv, 
-   "version;debug;merge;bed;cluster-only;cov-info;help;force-exons;gene2exon;no-pseudo;MINCOV=MINPID=hvOUNHWCVJMKQTDARZFGLEBm:g:i:r:s:t:o:w:x:y:d:");
+ GArgs args(argc, argv,
+   "version;debug;merge;bed;cluster-only;cov-info;help;force-exons;gene2exon;no-pseudo;MINCOV=MINPID=hvOUNHWCVJMKQTDARSZFGLEBm:g:i:r:s:t:o:w:x:y:d:");
  args.printError(USAGE, true);
  if (args.getOpt('h') || args.getOpt("help")) {
     GMessage("%s",USAGE);
@@ -842,6 +845,7 @@ int main(int argc, char * const argv[]) {
  bothStrands=(args.getOpt('B')!=NULL);
  fullCDSonly=(args.getOpt('J')!=NULL);
  spliceCheck=(args.getOpt('N')!=NULL);
+ StarStop=(args.getOpt('S')!=NULL);
  bool gene2exon=(args.getOpt("gene2exon")!=NULL);
  bool matchAllIntrons=(args.getOpt('K')==NULL);
  bool fuzzSpan=(args.getOpt('Q')!=NULL);
@@ -868,7 +872,7 @@ int main(int argc, char * const argv[]) {
  covInfo=(args.getOpt("cov-info"));
  if (covInfo) doCluster=true;
  if (fullCDSonly) validCDSonly=true;
- if (verbose) { 
+ if (verbose) {
      fprintf(stderr, "Command line was:\n");
      args.printCmdLine(stderr);
      }
@@ -877,7 +881,7 @@ int main(int argc, char * const argv[]) {
   exit(0);
  }
  fullattr=(args.getOpt('F')!=NULL);
- if (args.getOpt('G')==NULL) 
+ if (args.getOpt('G')==NULL)
     noExonAttr=!fullattr;
    else {
      noExonAttr=true;
@@ -893,7 +897,7 @@ int main(int argc, char * const argv[]) {
     noExonAttr=false;
     //sortByLoc=true;
     }
-    
+
  mergeCloseExons=(args.getOpt('Z')!=NULL);
  multiExon=(args.getOpt('U')!=NULL);
  writeExonSegs=(args.getOpt('W')!=NULL);
@@ -903,7 +907,7 @@ int main(int argc, char * const argv[]) {
  //    sortByLoc=true; //enforce sorting by chromosome/contig
  GStr s=args.getOpt('i');
  if (!s.is_empty()) maxintron=s.asInt();
- 
+
  FILE* f_repl=NULL;
  s=args.getOpt('d');
  if (!s.is_empty()) {
@@ -913,7 +917,7 @@ int main(int argc, char * const argv[]) {
        if (f_repl==NULL) GError("Error creating file %s\n", s.chars());
        }
    }
- 
+
  rfltWithin=(args.getOpt('R')!=NULL);
  s=args.getOpt('r');
  if (!s.is_empty()) {
@@ -929,7 +933,7 @@ int main(int argc, char * const argv[]) {
         rfltStrand=s[isep];
         s.cut(isep,1);
         }
-      if (isep>0) 
+      if (isep>0)
           rfltGSeq=Gstrdup((s.substr(0,isep)).chars());
       s.cut(0,isep+1);
       }
@@ -978,7 +982,7 @@ int main(int argc, char * const argv[]) {
  openfw(f_y, args, 'y');
  if (f_y!=NULL || f_x!=NULL) wCDSonly=true;
  //useBadCDS=useBadCDS || (fgtfok==NULL && fgtfbad==NULL && f_y==NULL && f_x==NULL);
- 
+
  int numfiles = args.startNonOpt();
  //GList<GffObj> gfkept(false,true); //unsorted, free items on delete
  int out_counter=0; //number of records printed
@@ -988,7 +992,7 @@ int main(int argc, char * const argv[]) {
           infile=args.nextNonOpt();
           if (infile.is_empty()) break;
           if (infile=="-") { f_in=stdin; infile="stdin"; }
-               else 
+               else
                  if ((f_in=fopen(infile, "r"))==NULL)
                     GError("Error: cannot open input file %s!\n",infile.chars());
                  else fclose(f_in);
@@ -1002,7 +1006,7 @@ int main(int argc, char * const argv[]) {
    gffloader.mergeCloseExons=mergeCloseExons;
    gffloader.showWarnings=(args.getOpt('E')!=NULL);
    gffloader.noPseudo=NoPseudo;
-   gffloader.load(g_data, &validateGffRec, doCluster, doCollapseRedundant, 
+   gffloader.load(g_data, &validateGffRec, doCluster, doCollapseRedundant,
                              matchAllIntrons, fuzzSpan, forceExons);
    if (doCluster)
      collectLocusData(g_data, covInfo);
@@ -1142,7 +1146,7 @@ int main(int argc, char * const argv[]) {
                 //print the parent first, if any
                 if (t.parent!=NULL && ((t.parent->udata & 4)==0)) {
                     GTData* pdata=(GTData*)(t.parent->uptr);
-                    if (pdata && pdata->geneinfo!=NULL) 
+                    if (pdata && pdata->geneinfo!=NULL)
                          pdata->geneinfo->finalize();
                     t.parent->printGxf(f_out, exonPrinting, tracklabel, NULL, decodeChars);
                     t.parent->udata|=4;

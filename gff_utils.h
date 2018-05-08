@@ -18,7 +18,7 @@ class GeneInfo { //for Ensembl GTF conversion
      gf=NULL;
      flag=0;
      }
-   GeneInfo(GffObj* gfrec, bool ensembl_convert=false):gene_names(true, true, true), 
+   GeneInfo(GffObj* gfrec, bool ensembl_convert=false):gene_names(true, true, true),
                     transcripts(true,true,true) {
      flag=0;
      if (gfrec->getGeneName())
@@ -62,9 +62,9 @@ class GeneInfo { //for Ensembl GTF conversion
      gfrec->parent=gf;
      gf->children.Add(gfrec);
      gfrec->incLevel();
-     if (gf->start>gfrec->start) 
+     if (gf->start>gfrec->start)
            gf->start=gfrec->start;
-     if (gf->end<gfrec->end) 
+     if (gf->end<gfrec->end)
            gf->end=gfrec->end;
      }
     void finalize() {
@@ -449,9 +449,9 @@ class GenomicSeqData {
   GenomicSeqData(int gid=-1):gfs(true, true, false),rnas((GCompareProc*)gfo_cmpByLoc),loci(true,true,false),
        tdata(false,true,false),  f_bases(0), r_bases(0), u_bases(0) {
   gseq_id=gid;
-  if (gseq_id>=0) 
+  if (gseq_id>=0)
     gseq_name=GffObj::names->gseqs.getName(gseq_id);
-  
+
   }
   bool operator==(GenomicSeqData& d){
     return gseq_id==d.gseq_id;
@@ -537,8 +537,8 @@ struct GffLoader {
   bool noPseudo;
   bool placeGf(GffObj* t, GenomicSeqData* gdata, bool doCluster=true, bool collapseRedundant=true,
                                     bool matchAllIntrons=true, bool fuzzSpan=false);
-  void load(GList<GenomicSeqData>&seqdata, GFValidateFunc* gf_validate=NULL, 
-                      bool doCluster=true, bool doCollapseRedundant=true, 
+  void load(GList<GenomicSeqData>&seqdata, GFValidateFunc* gf_validate=NULL,
+                      bool doCluster=true, bool doCollapseRedundant=true,
                       bool matchAllIntrons=true, bool fuzzSpan=false, bool forceExons=false);
   GffLoader(const char* filename):fname(filename) {
       f=NULL;
@@ -561,7 +561,7 @@ struct GffLoader {
       }
 };
 
-void printFasta(FILE* f, GStr& defline, char* seq, int seqlen=-1);
+void printFasta(FILE* f, GStr& defline, char* seq, int seqlen=-1, bool useStar=false);
 
 //"position" a given coordinate x within a list of transcripts sorted by their start (lowest)
 //coordinate, using quick-search; the returned int is the list index of the closest *higher*
