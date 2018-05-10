@@ -535,6 +535,7 @@ struct GffLoader {
   bool mergeCloseExons;
   bool showWarnings;
   bool noPseudo;
+  bool transSplicing;
   bool placeGf(GffObj* t, GenomicSeqData* gdata, bool doCluster=true, bool collapseRedundant=true,
                                     bool matchAllIntrons=true, bool fuzzSpan=false);
   void load(GList<GenomicSeqData>&seqdata, GFValidateFunc* gf_validate=NULL,
@@ -549,6 +550,7 @@ struct GffLoader {
       mergeCloseExons=false;
       showWarnings=false;
       noPseudo=false;
+      transSplicing=false;
       if (fname=="-" || fname=="stdin") {
          f=stdin;
          fname="stdin";

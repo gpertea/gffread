@@ -9,10 +9,10 @@
 #define USAGE "gffread v" VERSION ". Usage:\n\
 gffread <input_gff> [-g <genomic_seqs_fasta> | <dir>][-s <seq_info.fsize>] \n\
  [-o <outfile.gff>] [-t <tname>] [-r [[<strand>]<chr>:]<start>..<end> [-R]]\n\
- [-CTVNJMKQAFGUBHZWTOLE] [-w <exons.fa>] [-x <cds.fa>] [-y <tr_cds.fa>]\n\
+ [-CTVNJMKQAFGUBHZWTOLE] [-w <exons.fa>] [-x <cds.fa>] [-y <tr_cds.fa> [-S]]\n\
  [-i <maxintron>] \n\
  Filters and/or converts GFF3/GTF2 records.\n\
- <input_gff> is a GFF file, use '-' if the GFF records will be given at stdin\n\
+ <input_gff> is a GFF/GTF input file, use '-' for stdin\n\
  \n\
  Options:\n\
  -g  full path to a multi-fasta file with the genomic sequences\n\
@@ -48,7 +48,9 @@ gffread <input_gff> [-g <genomic_seqs_fasta> | <dir>][-s <seq_info.fsize>] \n\
  -J  discard any mRNAs that either lack initial START codon\n\
      or the terminal STOP codon, or have an in-frame stop codon\n\
      (i.e. only print mRNAs with a complete CDS)\n\
- --no-pseudo: filter out records matching the 'pseudo' keyword\n\
+ --trans-splicing: preserve trans-spliced transcripts (default is to break\n\
+     these into separate transcripts/loci)\n\
+ --no-pseudo: attempt to filter out records matching the 'pseudo' keyword\n\
  \n\
  -M/--merge : cluster the input transcripts into loci, collapsing matching\n\
        transcripts (those with the same exact introns and fully contained)\n\
@@ -86,7 +88,6 @@ gffread <input_gff> [-g <genomic_seqs_fasta> | <dir>][-s <seq_info.fsize>] \n\
  -T    for -o option output GTF instead of GFF3\n\
  --bed for -o option output BED format instead of GFF3\n\
 "
-
 
 class SeqInfo { //populated from the -s option of gffread
  public:
@@ -823,7 +824,7 @@ void printGffObj(FILE* f, GffObj* gfo, GStr& locname, GffPrintMode exonPrinting,
 
 int main(int argc, char * const argv[]) {
  GArgs args(argc, argv,
-   "version;debug;merge;bed;cluster-only;cov-info;help;force-exons;gene2exon;no-pseudo;MINCOV=MINPID=hvOUNHWCVJMKQTDARSZFGLEBm:g:i:r:s:t:o:w:x:y:d:");
+   "version;debug;merge;bed;cluster-only;cov-info;help;trans-splicing;force-exons;gene2exon;no-pseudo;MINCOV=MINPID=hvOUNHWCVJMKQTDARSZFGLEBm:g:i:r:s:t:o:w:x:y:d:");
  args.printError(USAGE, true);
  if (args.getOpt('h') || args.getOpt("help")) {
     GMessage("%s",USAGE);
@@ -1005,6 +1006,7 @@ int main(int argc, char * const argv[]) {
    gffloader.noExonAttrs=noExonAttr;
    gffloader.mergeCloseExons=mergeCloseExons;
    gffloader.showWarnings=(args.getOpt('E')!=NULL);
+   gffloader.transSplicing=(args.getOpt("trans-splicing")!=NULL);
    gffloader.noPseudo=NoPseudo;
    gffloader.load(g_data, &validateGffRec, doCluster, doCollapseRedundant,
                              matchAllIntrons, fuzzSpan, forceExons);
