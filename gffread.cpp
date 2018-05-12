@@ -48,8 +48,6 @@ gffread <input_gff> [-g <genomic_seqs_fasta> | <dir>][-s <seq_info.fsize>] \n\
  -J  discard any mRNAs that either lack initial START codon\n\
      or the terminal STOP codon, or have an in-frame stop codon\n\
      (i.e. only print mRNAs with a complete CDS)\n\
- --trans-splicing: preserve trans-spliced transcripts (default is to break\n\
-     these into separate transcripts/loci)\n\
  --no-pseudo: attempt to filter out records matching the 'pseudo' keyword\n\
  \n\
  -M/--merge : cluster the input transcripts into loci, collapsing matching\n\
@@ -824,7 +822,7 @@ void printGffObj(FILE* f, GffObj* gfo, GStr& locname, GffPrintMode exonPrinting,
 
 int main(int argc, char * const argv[]) {
  GArgs args(argc, argv,
-   "version;debug;merge;bed;cluster-only;cov-info;help;trans-splicing;force-exons;gene2exon;no-pseudo;MINCOV=MINPID=hvOUNHWCVJMKQTDARSZFGLEBm:g:i:r:s:t:o:w:x:y:d:");
+   "version;debug;merge;bed;cluster-only;cov-info;help;force-exons;gene2exon;no-pseudo;MINCOV=MINPID=hvOUNHWCVJMKQTDARSZFGLEBm:g:i:r:s:t:o:w:x:y:d:");
  args.printError(USAGE, true);
  if (args.getOpt('h') || args.getOpt("help")) {
     GMessage("%s",USAGE);
@@ -1006,7 +1004,7 @@ int main(int argc, char * const argv[]) {
    gffloader.noExonAttrs=noExonAttr;
    gffloader.mergeCloseExons=mergeCloseExons;
    gffloader.showWarnings=(args.getOpt('E')!=NULL);
-   gffloader.transSplicing=(args.getOpt("trans-splicing")!=NULL);
+   //gffloader.transSplicing=(args.getOpt("trans-splicing")!=NULL);
    gffloader.noPseudo=NoPseudo;
    gffloader.load(g_data, &validateGffRec, doCluster, doCollapseRedundant,
                              matchAllIntrons, fuzzSpan, forceExons);
