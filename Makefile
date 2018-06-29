@@ -10,31 +10,60 @@ else
     MARCH = 
 endif    
 
-CC      := g++
+CXX   := $(if $(CXX),$(CXX),g++)
+LINKER  := $(if $(LINKER),$(LINKER),g++)
+
+LDFLAGS := $(if $(LDFLAGS),$(LDFLAGS),)
+
+#CC      := g++
 
 BASEFLAGS  := -Wall -Wextra ${SEARCHDIRS} $(MARCH) -D_FILE_OFFSET_BITS=64 \
 -D_LARGEFILE_SOURCE -D_REENTRANT -fno-strict-aliasing -fno-exceptions -fno-rtti
 
-#add the link-time optimization flag if gcc version > 4.5
-GCC_VERSION:=$(subst ., ,$(shell gcc -dumpversion))
-GCC_MAJOR:=$(word 1,$(GCC_VERSION))
-GCC_MINOR:=$(word 2,$(GCC_VERSION))
-#GCC_SUB:=$(word 3,$(GCC_VERSION))
-GCC_SUB:=x
-
-GCC45OPTS :=
-GCC45OPTMAIN :=
-
-ifeq ($(findstring release,$(MAKECMDGOALS)),release)
-  CFLAGS := -O2 -DNDEBUG $(BASEFLAGS)
-  LDFLAGS :=
+ifneq (,$(filter %release %static, $(MAKECMDGOALS)))
+  # -- release build
+  #RELEASE_BUILD=1
+  CXXFLAGS := $(if $(CXXFLAGS),$(CXXFLAGS), -O3)
+  CXXFLAGS += -DNDEBUG $(BASEFLAGS)
 else
-  CFLAGS := -g -DDEBUG $(BASEFLAGS)
-  LDFLAGS := -g
+  ifneq (,$(filter %memcheck %memdebug, $(MAKECMDGOALS)))
+     #use sanitizer in gcc 4.9+
+     MEMCHECK_BUILD=1
+     GCCVER49 := $(shell expr `g++ -dumpversion | cut -f1,2 -d.` \>= 4.9)
+     ifeq "$(GCCVER49)" "0"
+       $(error gcc version 4.9 or greater is required for this build target)
+     endif
+     CXXFLAGS := $(if $(CXXFLAGS),$(CXXFLAGS),-g -O0)
+     CXXFLAGS += -fno-omit-frame-pointer -fsanitize=undefined -fsanitize=address $(BASEFLAGS)
+     GCCVER5 := $(shell expr `g++ -dumpversion | cut -f1 -d.` \>= 5)
+     ifeq "$(GCCVER5)" "1"
+       CXXFLAGS += -fsanitize=bounds -fsanitize=float-divide-by-zero -fsanitize=vptr
+       CXXFLAGS += -fsanitize=float-cast-overflow -fsanitize=object-size
+       #CXXFLAGS += -fcheck-pointer-bounds -mmpx
+     endif
+     CXXFLAGS += -DDEBUG -D_DEBUG -DGDEBUG -fno-common -fstack-protector
+     LIBS := -lasan -lubsan -ldl $(LIBS)
+  else
+     #just plain debug build
+     DEBUG_BUILD=1
+     CXXFLAGS := $(if $(CXXFLAGS),$(CXXFLAGS),-g -O0)
+     CXXFLAGS += -DDEBUG -D_DEBUG -DGDEBUG $(BASEFLAGS)
+  endif
 endif
 
+#ifneq (,$(filter %memtrace %memusage %memuse, $(MAKECMDGOALS)))
+#    CXXFLAGS += -DGMEMTRACE
+#    OBJS += ${GDIR}/proc_mem.o
+#endif
+
+#ifdef DEBUG_BUILD
+#  #$(warning Building DEBUG version of stringtie.. )
+#  DBG_WARN=@echo
+#  DBG_WARN+='WARNING: built DEBUG version [much slower], use "make clean release" for a faster, optimized version of the program.'
+#endif
+
 %.o : %.cpp
-	${CC} ${CFLAGS} -c $< -o $@
+	${CXX} ${CXXFLAGS} -c $< -o $@
 
 # C/C++ linker
 
@@ -45,13 +74,9 @@ OBJS := ${GCLDIR}/GBase.o ${GCLDIR}/GArgs.o ${GCLDIR}/GFaSeqGet.o \
  ${GCLDIR}/GFastaIndex.o gff_utils.o
  
 .PHONY : all
-all:    gffread
 
-version: ; @echo "GCC Version is: "$(GCC_MAJOR)":"$(GCC_MINOR)":"$(GCC_SUB)
-	@echo "> GCC Opt. string is: "$(GCC45OPTS)
-debug:  gffread
 nodebug: release
-release: gffread
+all release debug memcheck memdebug: gffread
 
 $(OBJS) : $(GCLDIR)/GBase.h $(GCLDIR)/gff.h
 gffread.o : gff_utils.h $(GCLDIR)/GBase.h $(GCLDIR)/gff.h
@@ -59,12 +84,15 @@ gff_utils.o : gff_utils.h $(GCLDIR)/gff.h
 ${GCLDIR}/gff.o : ${GCLDIR}/gff.h ${GCLDIR}/GFaSeqGet.h ${GCLDIR}/GList.hh ${GCLDIR}/GHash.hh
 ${GCLDIR}/GFaSeqGet.o : ${GCLDIR}/GFaSeqGet.h
 gffread: $(OBJS) gffread.o
-	${LINKER} ${LDFLAGS} $(GCC45OPTS) $(GCC45OPTMAIN) -o $@ ${filter-out %.a %.so, $^} ${LIBS}
+	${LINKER} ${LDFLAGS} -o $@ ${filter-out %.a %.so, $^} ${LIBS}
+#	@echo
+#	${DBG_WARN}
+
 
 # target for removing all object files
 
 .PHONY : clean
-clean:: 
+clean:
 	@${RM} gffread gffread.o* gffread.exe $(OBJS)
 	@${RM} core.*
 
