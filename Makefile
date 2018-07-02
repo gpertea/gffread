@@ -1,4 +1,5 @@
-GCLDIR := ../gclib
+GCLDIR := $(if $(GCLDIR),$(GCLDIR),../gclib)
+
 SEARCHDIRS := -I. -I${GCLDIR}
 
 SYSTYPE :=     $(shell uname)
@@ -7,8 +8,6 @@ CXX   := $(if $(CXX),$(CXX),g++)
 LINKER  := $(if $(LINKER),$(LINKER),g++)
 
 LDFLAGS := $(if $(LDFLAGS),$(LDFLAGS),-g)
-
-#CC      := g++
 
 BASEFLAGS  := -Wall -Wextra ${SEARCHDIRS} -D_FILE_OFFSET_BITS=64 \
 -D_LARGEFILE_SOURCE -D_REENTRANT -fno-strict-aliasing -fno-exceptions -fno-rtti
