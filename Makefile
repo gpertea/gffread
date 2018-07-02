@@ -3,51 +3,48 @@ SEARCHDIRS := -I. -I${GCLDIR}
 
 SYSTYPE :=     $(shell uname)
 
-MACHTYPE :=     $(shell uname -m)
-ifeq ($(MACHTYPE), i686)
-    MARCH = -march=i686
-else
-    MARCH = 
-endif    
-
 CXX   := $(if $(CXX),$(CXX),g++)
 LINKER  := $(if $(LINKER),$(LINKER),g++)
 
-LDFLAGS := $(if $(LDFLAGS),$(LDFLAGS),)
+LDFLAGS := $(if $(LDFLAGS),$(LDFLAGS),-g)
 
 #CC      := g++
 
-BASEFLAGS  := -Wall -Wextra ${SEARCHDIRS} $(MARCH) -D_FILE_OFFSET_BITS=64 \
+BASEFLAGS  := -Wall -Wextra ${SEARCHDIRS} -D_FILE_OFFSET_BITS=64 \
 -D_LARGEFILE_SOURCE -D_REENTRANT -fno-strict-aliasing -fno-exceptions -fno-rtti
+
+GCCV8 := $(shell expr `g++ -dumpversion | cut -f1 -d.` \>= 8)
+ifeq "$(GCCV8)" "1"
+ BASEFLAGS += -Wno-class-memaccess
+endif
+
+CXXFLAGS := $(if $(CXXFLAGS),$(BASEFLAGS) $(CXXFLAGS),$(BASEFLAGS))
 
 ifneq (,$(filter %release %static, $(MAKECMDGOALS)))
   # -- release build
-  #RELEASE_BUILD=1
-  CXXFLAGS := $(if $(CXXFLAGS),$(CXXFLAGS), -O3)
-  CXXFLAGS += -DNDEBUG $(BASEFLAGS)
+  #RELEASE_BUILD := 1
+  CXXFLAGS := -g -O3 -DNDEBUG $(CXXFLAGS)
 else
+  CXXFLAGS += -g -O0 -DDEBUG -D_DEBUG -DGDEBUG
   ifneq (,$(filter %memcheck %memdebug, $(MAKECMDGOALS)))
      #use sanitizer in gcc 4.9+
-     MEMCHECK_BUILD=1
+     MEMCHECK_BUILD := 1
      GCCVER49 := $(shell expr `g++ -dumpversion | cut -f1,2 -d.` \>= 4.9)
      ifeq "$(GCCVER49)" "0"
        $(error gcc version 4.9 or greater is required for this build target)
      endif
-     CXXFLAGS := $(if $(CXXFLAGS),$(CXXFLAGS),-g -O0)
-     CXXFLAGS += -fno-omit-frame-pointer -fsanitize=undefined -fsanitize=address $(BASEFLAGS)
+     CXXFLAGS += -fno-omit-frame-pointer -fsanitize=undefined -fsanitize=address
      GCCVER5 := $(shell expr `g++ -dumpversion | cut -f1 -d.` \>= 5)
      ifeq "$(GCCVER5)" "1"
        CXXFLAGS += -fsanitize=bounds -fsanitize=float-divide-by-zero -fsanitize=vptr
        CXXFLAGS += -fsanitize=float-cast-overflow -fsanitize=object-size
        #CXXFLAGS += -fcheck-pointer-bounds -mmpx
      endif
-     CXXFLAGS += -DDEBUG -D_DEBUG -DGDEBUG -fno-common -fstack-protector
+     CXXFLAGS += -fno-common -fstack-protector
      LIBS := -lasan -lubsan -ldl $(LIBS)
   else
      #just plain debug build
-     DEBUG_BUILD=1
-     CXXFLAGS := $(if $(CXXFLAGS),$(CXXFLAGS),-g -O0)
-     CXXFLAGS += -DDEBUG -D_DEBUG -DGDEBUG $(BASEFLAGS)
+     DEBUG_BUILD := 1
   endif
 endif
 
@@ -67,8 +64,6 @@ endif
 
 # C/C++ linker
 
-LINKER  := g++
-LIBS := 
 OBJS := ${GCLDIR}/GBase.o ${GCLDIR}/GArgs.o ${GCLDIR}/GFaSeqGet.o \
  ${GCLDIR}/gdna.o ${GCLDIR}/codons.o ${GCLDIR}/gff.o ${GCLDIR}/GStr.o \
  ${GCLDIR}/GFastaIndex.o gff_utils.o
