@@ -821,7 +821,7 @@ void printGffObj(FILE* f, GffObj* gfo, GStr& locname, GffPrintMode exonPrinting,
 }
 
 
-int main(int argc, char * const argv[]) {
+int main(int argc, char* argv[]) {
  GArgs args(argc, argv,
    "version;debug;merge;bed;cluster-only;cov-info;help;force-exons;gene2exon;no-pseudo;MINCOV=MINPID=hvOUNHWCVJMKQTDARSZFGLEBm:g:i:r:s:t:o:w:x:y:d:");
  args.printError(USAGE, true);
