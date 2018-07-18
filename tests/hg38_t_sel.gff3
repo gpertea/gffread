@@ -1,0 +1,60 @@
+chr19_GL949746v1_alt	BestRefSeq	mRNA	77273	81394	.	+	.	ID=rna158924;geneID=gene56702;gene_name=NDUFA3;Dbxref=GeneID:4696,Genbank:NM_004542.3,HGNC:HGNC:7686,HPRD:04830,MIM:603832;Name=NM_004542.3;gbkey=mRNA;product=NADH:ubiquinone oxidoreductase subunit A3;transcript_id=NM_004542.3;gbkey=Gene;gene_biotype=protein_coding;gene_synonym=B9,CI-B9;locus=RLOC_00045615
+chr19_GL949746v1_alt	BestRefSeq	exon	77273	77309	.	+	.	Parent=rna158924
+chr19_GL949746v1_alt	BestRefSeq	exon	77535	77609	.	+	.	Parent=rna158924
+chr19_GL949746v1_alt	BestRefSeq	exon	80354	80431	.	+	.	Parent=rna158924
+chr19_GL949746v1_alt	BestRefSeq	exon	81231	81394	.	+	.	Parent=rna158924
+chr19_GL949746v1_alt	BestRefSeq	CDS	77300	77309	.	+	0	Parent=rna158924
+chr19_GL949746v1_alt	BestRefSeq	CDS	77535	77609	.	+	2	Parent=rna158924
+chr19_GL949746v1_alt	BestRefSeq	CDS	80354	80431	.	+	2	Parent=rna158924
+chr19_GL949746v1_alt	BestRefSeq	CDS	81231	81322	.	+	2	Parent=rna158924
+chr19_GL000209v2_alt	BestRefSeq	mRNA	58332	72919	.	-	.	ID=rna164010;geneID=gene60044;gene_name=KIR3DS1;Dbxref=GeneID:3813,Genbank:NM_001282171.1,HGNC:HGNC:6340;Name=NM_001282171.1;gbkey=mRNA;product=killer cell immunoglobulin like receptor, three Ig domains and short cytoplasmic tail 1, transcript variant 3;transcript_id=NM_001282171.1;description=killer cell immunoglobulin like receptor, three Ig domains and short cytoplasmic tail 1;gbkey=Gene;gene_biotype=protein_coding;gene_synonym=CD158E2,KIR-123FM,KIR-G1,NKAT-10,NKAT10;locus=RLOC_00048299
+chr19_GL000209v2_alt	BestRefSeq	exon	58332	58904	.	-	.	Parent=rna164010
+chr19_GL000209v2_alt	BestRefSeq	exon	59003	59053	.	-	.	Parent=rna164010
+chr19_GL000209v2_alt	BestRefSeq	exon	59516	59621	.	-	.	Parent=rna164010
+chr19_GL000209v2_alt	BestRefSeq	exon	63902	63952	.	-	.	Parent=rna164010
+chr19_GL000209v2_alt	BestRefSeq	exon	67123	67416	.	-	.	Parent=rna164010
+chr19_GL000209v2_alt	BestRefSeq	exon	68997	69296	.	-	.	Parent=rna164010
+chr19_GL000209v2_alt	BestRefSeq	exon	72849	72919	.	-	.	Parent=rna164010
+chr19_GL000209v2_alt	BestRefSeq	CDS	59011	59053	.	-	1	Parent=rna164010
+chr19_GL000209v2_alt	BestRefSeq	CDS	59516	59621	.	-	2	Parent=rna164010
+chr19_GL000209v2_alt	BestRefSeq	CDS	63902	63952	.	-	2	Parent=rna164010
+chr19_GL000209v2_alt	BestRefSeq	CDS	67123	67416	.	-	2	Parent=rna164010
+chr19_GL000209v2_alt	BestRefSeq	CDS	68997	69296	.	-	2	Parent=rna164010
+chr19_GL000209v2_alt	BestRefSeq	CDS	72849	72882	.	-	0	Parent=rna164010
+chr19_GL383573v1_alt	BestRefSeq	mRNA	266529	287253	.	+	.	ID=rna158867;geneID=gene56662;gene_name=ZNF85;Dbxref=GeneID:7639,Genbank:NM_001256172.1,HGNC:HGNC:13160,MIM:603899;Name=NM_001256172.1;gbkey=mRNA;product=zinc finger protein 85, transcript variant 2;transcript_id=NM_001256172.1;description=zinc finger protein 85;gbkey=Gene;gene_biotype=protein_coding;gene_synonym=HPF4,HTF1;locus=RLOC_00045585
+chr19_GL383573v1_alt	BestRefSeq	exon	266529	266679	.	+	.	Parent=rna158867
+chr19_GL383573v1_alt	BestRefSeq	exon	277300	277426	.	+	.	Parent=rna158867
+chr19_GL383573v1_alt	BestRefSeq	exon	278225	278323	.	+	.	Parent=rna158867
+chr19_GL383573v1_alt	BestRefSeq	exon	286077	287253	.	+	.	Parent=rna158867
+chr19_GL383573v1_alt	BestRefSeq	CDS	266677	266679	.	+	0	Parent=rna158867
+chr19_GL383573v1_alt	BestRefSeq	CDS	277300	277426	.	+	0	Parent=rna158867
+chr19_GL383573v1_alt	BestRefSeq	CDS	278225	278323	.	+	2	Parent=rna158867
+chr19_GL383573v1_alt	BestRefSeq	CDS	286077	286111	.	+	2	Parent=rna158867
+chr19_GL949746v1_alt	Gnomon	mRNA	191078	197856	.	-	.	ID=rna158951;geneID=gene56712;gene_name=LOC107987425;Dbxref=GeneID:107987425,Genbank:XM_006726280.1;Name=XM_006726280.1;gbkey=mRNA;model_evidence=Supporting evidence includes similarity to: 54 mRNAs, 11 ESTs, 31 Proteins, and 88% coverage of the annotated genomic feature by RNAseq alignments, including 26 samples with support for all annotated introns;product=leukocyte immunoglobulin-like receptor subfamily B member 3, transcript variant X3;transcript_id=XM_006726280.1;gene_biotype=protein_coding;locus=RLOC_00045625
+chr19_GL949746v1_alt	Gnomon	exon	191078	192039	.	-	.	Parent=rna158951
+chr19_GL949746v1_alt	Gnomon	exon	192119	192274	.	-	.	Parent=rna158951
+chr19_GL949746v1_alt	Gnomon	exon	193161	193213	.	-	.	Parent=rna158951
+chr19_GL949746v1_alt	Gnomon	exon	193445	193482	.	-	.	Parent=rna158951
+chr19_GL949746v1_alt	Gnomon	exon	193563	193638	.	-	.	Parent=rna158951
+chr19_GL949746v1_alt	Gnomon	exon	193929	194045	.	-	.	Parent=rna158951
+chr19_GL949746v1_alt	Gnomon	exon	194955	195005	.	-	.	Parent=rna158951
+chr19_GL949746v1_alt	Gnomon	exon	195328	195630	.	-	.	Parent=rna158951
+chr19_GL949746v1_alt	Gnomon	exon	195883	196179	.	-	.	Parent=rna158951
+chr19_GL949746v1_alt	Gnomon	exon	196628	196930	.	-	.	Parent=rna158951
+chr19_GL949746v1_alt	Gnomon	exon	197078	197362	.	-	.	Parent=rna158951
+chr19_GL949746v1_alt	Gnomon	exon	197547	197582	.	-	.	Parent=rna158951
+chr19_GL949746v1_alt	Gnomon	exon	197743	197856	.	-	.	Parent=rna158951
+chr19_GL949746v1_alt	Gnomon	CDS	191893	192039	.	-	0	Parent=rna158951
+chr19_GL949746v1_alt	Gnomon	CDS	192119	192274	.	-	0	Parent=rna158951
+chr19_GL949746v1_alt	Gnomon	CDS	193161	193213	.	-	2	Parent=rna158951
+chr19_GL949746v1_alt	Gnomon	CDS	193445	193482	.	-	1	Parent=rna158951
+chr19_GL949746v1_alt	Gnomon	CDS	193563	193638	.	-	2	Parent=rna158951
+chr19_GL949746v1_alt	Gnomon	CDS	193929	194045	.	-	2	Parent=rna158951
+chr19_GL949746v1_alt	Gnomon	CDS	194955	195005	.	-	2	Parent=rna158951
+chr19_GL949746v1_alt	Gnomon	CDS	195328	195630	.	-	2	Parent=rna158951
+chr19_GL949746v1_alt	Gnomon	CDS	195883	196179	.	-	2	Parent=rna158951
+chr19_GL949746v1_alt	Gnomon	CDS	196628	196930	.	-	2	Parent=rna158951
+chr19_GL949746v1_alt	Gnomon	CDS	197078	197362	.	-	2	Parent=rna158951
+chr19_GL949746v1_alt	Gnomon	CDS	197547	197582	.	-	2	Parent=rna158951
+chr19_GL949746v1_alt	Gnomon	CDS	197743	197776	.	-	0	Parent=rna158951
+
