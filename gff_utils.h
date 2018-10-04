@@ -563,6 +563,8 @@ struct GffLoader {
 
 void printFasta(FILE* f, GStr& defline, char* seq, int seqlen=-1, bool useStar=false);
 
+void printTabFormat(FILE* f, GffObj* t);
+
 //"position" a given coordinate x within a list of transcripts sorted by their start (lowest)
 //coordinate, using quick-search; the returned int is the list index of the closest *higher*
 //GffObj - i.e. starting right *ABOVE* the given coordinate

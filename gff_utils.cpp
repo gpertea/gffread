@@ -4,6 +4,17 @@ extern bool verbose;
 
 //bool debugState=false;
 
+void printTabFormat(FILE* f, GffObj* t) {
+	fprintf(f, "%s\t%s\t%c\t%d\%d\t%d", t->getID(), t->getGSeqName(), t->strand, t->start, t->end, t->exons.Count());
+	t->printExonList(f);
+	if (t->hasCDS()) fprintf(f, "%d:%d", t->CDstart, t->CDend);
+	 else fprintf(f, ".");
+	char* geneid=t->getGeneID();
+	if (geneid)
+		fprintf(f, "\t%s", geneid);
+	fprintf(f, "\n");
+}
+
 void printFasta(FILE* f, GStr& defline, char* seq, int seqlen, bool useStar) {
  if (seq==NULL) return;
  int len=(seqlen>0)?seqlen:strlen(seq);
