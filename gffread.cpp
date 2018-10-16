@@ -4,12 +4,12 @@
 #define __STDC_FORMAT_MACROS
 #include <inttypes.h>
 
-#define VERSION "0.10.2"
+#define VERSION "0.10.3"
 
 #define USAGE "gffread v" VERSION ". Usage:\n\
 gffread <input_gff> [-g <genomic_seqs_fasta> | <dir>][-s <seq_info.fsize>] \n\
  [-o <outfile.gff>] [-t <tname>] [-r [[<strand>]<chr>:]<start>..<end> [-R]]\n\
- [-CTVNJMKQAFGUBHZWTOLE] [-w <exons.fa>] [-x <cds.fa>] [-y <tr_cds.fa>]\n\
+ [-CTVNJMKQAFPGUBHZWTOLE] [-w <exons.fa>] [-x <cds.fa>] [-y <tr_cds.fa>]\n\
  [-i <maxintron>] \n\
  Filters and/or converts GFF3/GTF2 records.\n\
  <input_gff> is a GFF file, use '-' if the GFF records will be given at stdin\n\
@@ -38,12 +38,14 @@ gffread <input_gff> [-g <genomic_seqs_fasta> | <dir>][-s <seq_info.fsize>] \n\
  \n\
  -O   process also non-transcript GFF records (by default non-transcript\n\
       records are ignored)\n\
- -V   discard any mRNAs with CDS having in-frame stop codons\n\
+ -V   discard any mRNAs with CDS having in-frame stop codons (requires -g)\n\
  -H   for -V option, check and adjust the starting CDS phase\n\
       if the original phase leads to a translation with an \n\
       in-frame stop codon\n\
  -B   for -V option, single-exon transcripts are also checked on the\n\
-      opposite strand\n\
+      opposite strand (requires -g)\n\
+ -P   add transcript level GFF attributes about the coding status of each\n\
+      transcript, including partialness or in-frame stop codons (requires -g)\n\
  -N   discard multi-exon mRNAs that have any intron with a non-canonical\n\
       splice site consensus (i.e. not GT-AG, GC-AG or AT-AC)\n\
  -J   discard any mRNAs that either lack initial START codon\n\
@@ -71,8 +73,9 @@ gffread <input_gff> [-g <genomic_seqs_fasta> | <dir>][-s <seq_info.fsize>] \n\
  -Z    merge close exons into a single exon (for intron size<4)\n\
  -w    write a fasta file with spliced exons for each GFF transcript\n\
  -x    write a fasta file with spliced CDS for each GFF transcript\n\
- -W    for -w and -x options, also write for each fasta record the exon\n\
-       coordinates projected onto the spliced sequence\n\
+ -W    for -w and -x options, write in the FASTA defline the exon\n\
+       coordinates projected onto the spliced sequence;\n\
+       for -y option, write transcript attributes in the FASTA defline\n\
  -y    write a protein fasta file with the translation of CDS for each record\n\
  -S    for -y option, use '*' instead of '.' as stop codon translation\n\
  -L    Ensembl GTF to GFF3 conversion (implies -F; should be used with -m)\n\
@@ -86,7 +89,7 @@ gffread <input_gff> [-g <genomic_seqs_fasta> | <dir>][-s <seq_info.fsize>] \n\
  -t    use <trackname> in the 2nd column of each GFF/GTF output line\n\
  -T    output GTF instead of GFF3 (for -o) \n\
  --bed output BED format instead of GFF3 (for -o)\n\
- --tab for -o option output tab delimited format instead of GFF3:\n\
+ --tab for -o option, output tab delimited format instead of GFF3:\n\
       <t_id> <chr> <strand> <t_start> <t_end> <exonCount> <exons> <CDScoords>\n\
       (<exons> are shown as a comma-delimited list of start-end coordinates;\n\
       <CDScoords> is '.' if no CDS is present, or CDS_start:CDS_end otherwise)\n\
@@ -235,6 +238,7 @@ bool validCDSonly=false; // translation with no in-frame STOP
 bool bothStrands=false; //for single-exon mRNA validation, check the other strand too
 bool altPhases=false; //if original phase fails translation validation,
                      //try the other 2 phases until one makes it
+bool addCDSattrs=false;
 bool covInfo=false; // --cov-info option -- report genome coverage per strand
 bool mRNAOnly=true;
 bool NoPseudo=false;
@@ -477,7 +481,7 @@ bool process_transcript(GFastaDb& gfasta, GffObj& gffrec) {
   }
   GList<GSeg> seglst(false,true);
   GFaSeqGet* faseq=NULL;
-  if (f_x!=NULL || f_y!=NULL || f_w!=NULL || spliceCheck || validCDSonly) {
+  if (f_x!=NULL || f_y!=NULL || f_w!=NULL || spliceCheck || validCDSonly || addCDSattrs) {
 	  faseq=fastaSeqGet(gfasta, gffrec.getGSeqName());
       if (faseq==NULL)
 	    	GError("Error: no genomic sequence available (check -g option!).\n");
@@ -500,7 +504,7 @@ bool process_transcript(GFastaDb& gfasta, GffObj& gffrec) {
             ssValid=false;break;
             }
          }
-      else if (acceptorSite=="AC") { //
+      else if (acceptorSite=="AC") { //AT-AC also accepted
          if (donorSite!="AT") { ssValid=false; break; }
          }
       else { ssValid=false; break; }
@@ -516,25 +520,18 @@ bool process_transcript(GFastaDb& gfasta, GffObj& gffrec) {
   int mCDphase=0;
   bool fullCDS=false;
   bool endStop=false;
+  if (addCDSattrs && gffrec.hasCDS()) gffrec.addAttr("hasCDS", "true");
   if (gffrec.CDphase=='1' || gffrec.CDphase=='2')
       mCDphase = gffrec.CDphase-'0';
-  //CStopAdjData* adjstop=NULL;
-  if (f_y!=NULL || f_x!=NULL || validCDSonly) {
-    /*
-    adjstop=new CStopAdjData(faseq->getseqlen(), &gffrec);
-    if (validCDSonly) {
-      //STOP codon should be included in the CDS, so just in case it wasn't
-      //we make sure to fetch an additional end codon if available
-      adjstop->apply(3);
-    }
-    */
+  //CDS partialness only added when -y -x -V options are given
+  if (f_y!=NULL || f_x!=NULL || validCDSonly || addCDSattrs) {
     int strandNum=0;
     int phaseNum=0;
   CDS_CHECK:
     cdsnt=gffrec.getSpliced(faseq, true, &seqlen, NULL, NULL, &seglst);
     //if (cdsnt==NULL) trprint=false;
     if (cdsnt!=NULL) { //has CDS
-      if (validCDSonly) {
+      //if (validCDSonly) {
          cdsaa=translateDNA(cdsnt, aalen, seqlen);
          char* p=strchr(cdsaa,'.');
          endStop=false;
@@ -583,12 +580,21 @@ bool process_transcript(GFastaDb& gfasta, GffObj& gffrec) {
                  }
               }
            if (verbose) GMessage("In-frame STOP found for '%s'\n",gffrec.getID());
-           } //has in-frame STOP
-         fullCDS=(endStop && cdsaa[0]=='M');
-         if (!fullCDS) gffrec.addAttr("partial", "true");
+           gffrec.addAttr("InFrameStop", "true");
+         } //has in-frame STOP
+         bool hasStart=(cdsaa[0]=='M'); //could be a
+         fullCDS=(endStop && hasStart);
+         if (!fullCDS) {
+        	 const char* partialness=NULL;
+        	 if (hasStart) partialness="3";
+        	 else {
+        		partialness = endStop ? "5" : "5_3";
+        	 }
+        	 gffrec.addAttr("partialness", partialness);
+         }
          if (trprint && fullCDSonly && !fullCDS)
         	 trprint=false;
-         } // CDS check requested
+         //} // Valid CDS only requested?
       } //has CDS
   } //translation or codon check was requested
   if (!trprint) {
@@ -835,7 +841,7 @@ void printGffObj(FILE* f, GffObj* gfo, GStr& locname, GffPrintMode exonPrinting,
 
 int main(int argc, char* argv[]) {
  GArgs args(argc, argv,
-   "version;debug;merge;bed;tab;cluster-only;nc;cov-info;help;force-exons;gene2exon;no-pseudo;MINCOV=MINPID=hvOUNHWCVJMKQTDARSZFGLEBm:g:i:r:s:t:o:w:x:y:d:");
+   "version;debug;merge;bed;tab;cluster-only;nc;cov-info;help;force-exons;gene2exon;no-pseudo;MINCOV=MINPID=hvOUNHPWCVJMKQTDARSZFGLEBm:g:i:r:s:t:o:w:x:y:d:");
  args.printError(USAGE, true);
  if (args.getOpt('h') || args.getOpt("help")) {
     GMessage("%s",USAGE);
@@ -851,6 +857,7 @@ int main(int argc, char* argv[]) {
  verbose=(args.getOpt('v')!=NULL);
  wCDSonly=(args.getOpt('C')!=NULL);
  wNConly=(args.getOpt("nc")!=NULL);
+ addCDSattrs=(args.getOpt('P')!=NULL);
  validCDSonly=(args.getOpt('V')!=NULL);
  altPhases=(args.getOpt('H')!=NULL);
  fmtGTF=(args.getOpt('T')!=NULL); //switch output format to GTF
