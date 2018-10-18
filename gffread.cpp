@@ -89,11 +89,11 @@ gffread <input_gff> [-g <genomic_seqs_fasta> | <dir>][-s <seq_info.fsize>] \n\
  -t    use <trackname> in the 2nd column of each GFF/GTF output line\n\
  -T    output GTF instead of GFF3 (for -o) \n\
  --bed output BED format instead of GFF3 (for -o)\n\
- --tab for -o option, output tab delimited format instead of GFF3:\n\
-      <t_id> <chr> <strand> <t_start> <t_end> <exonCount> <exons> <CDScoords>\n\
+ --tab for -o option, output transcripts in one-line tab delimited format:\n\
+      tID  chr  +/-  t_start  t_end  exonCount  exons  CDScoords  GFF_attrs ...\n\
       (<exons> are shown as a comma-delimited list of start-end coordinates;\n\
       <CDScoords> is '.' if no CDS is present, or CDS_start:CDS_end otherwise)\n\
-	  if a gene ID is present, it is added as a last field\n\
+	  The other GFF attributes, if any, are appended as name=value columns\n\
 "
 
 

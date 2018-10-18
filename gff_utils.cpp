@@ -5,13 +5,25 @@ extern bool verbose;
 //bool debugState=false;
 
 void printTabFormat(FILE* f, GffObj* t) {
+	static char dbuf[1024];
 	fprintf(f, "%s\t%s\t%c\t%d\t%d\t%d\t", t->getID(), t->getGSeqName(), t->strand, t->start, t->end, t->exons.Count());
 	t->printExonList(f);
 	if (t->hasCDS()) fprintf(f, "\t%d:%d", t->CDstart, t->CDend);
 	 else fprintf(f, "\t.");
-	char* geneid=t->getGeneID();
-	if (geneid)
-		fprintf(f, "\t%s", geneid);
+
+	if (t->getGeneID()!=NULL)
+	    fprintf(f, "\tgeneID=%s",t->getGeneID());
+	if (t->getGeneName()!=NULL) {
+	    GffObj::decodeHexChars(dbuf, t->getGeneName());
+	    fprintf(f, "\tgene_name=%s", dbuf);
+	}
+	if (t->attrs!=NULL) {
+	    for (int i=0;i<t->attrs->Count();i++) {
+	       const char* attrname=t->getAttrName(i);
+	       GffObj::decodeHexChars(dbuf, t->attrs->Get(i)->attr_val);
+	       fprintf(f,"\t%s=%s", attrname, dbuf);
+	    }
+	}
 	fprintf(f, "\n");
 }
 
