@@ -52,6 +52,10 @@ gffread <input_gff> [-g <genomic_seqs_fasta> | <dir>][-s <seq_info.fsize>] \n\
       or the terminal STOP codon, or have an in-frame stop codon\n\
       (i.e. only print mRNAs with a complete CDS)\n\
  --no-pseudo: filter out records matching the 'pseudo' keyword\n\
+ --in-bed: input should be parsed as BED format (automatic if filename ends\n\
+      with .bed*)\n\
+ --in-tab: input is tab delimited one-line-per-transcript format as described\n\
+           below for the --tab output option\n\
  \n\
  -M/--merge : cluster the input transcripts into loci, collapsing matching\n\
        transcripts (those with the same exact introns and fully contained)\n\
@@ -95,7 +99,6 @@ gffread <input_gff> [-g <genomic_seqs_fasta> | <dir>][-s <seq_info.fsize>] \n\
       <CDScoords> is '.' if no CDS is present, or CDS_start:CDS_end otherwise)\n\
 	  The other GFF attributes, if any, are appended as name=value columns\n\
 "
-
 
 class SeqInfo { //populated from the -s option of gffread
  public:
@@ -251,7 +254,8 @@ bool fullCDSonly=false; // starts with START, ends with STOP codon
 bool fullattr=false;
 //bool sortByLoc=false; // if the GFF output should be sorted by location
 bool ensembl_convert=false; //-L, assist in converting Ensembl GTF to GFF3
-
+bool BEDinput=false;
+bool TABinput=false;
 
 //GStr gseqpath;
 //GStr gcdbfa;
@@ -841,7 +845,7 @@ void printGffObj(FILE* f, GffObj* gfo, GStr& locname, GffPrintMode exonPrinting,
 
 int main(int argc, char* argv[]) {
  GArgs args(argc, argv,
-   "version;debug;merge;bed;tab;cluster-only;nc;cov-info;help;force-exons;gene2exon;no-pseudo;MINCOV=MINPID=hvOUNHPWCVJMKQTDARSZFGLEBm:g:i:r:s:t:o:w:x:y:d:");
+   "version;debug;merge;bed;in-bed;tab;in-tab;cluster-only;nc;cov-info;help;force-exons;gene2exon;no-pseudo;MINCOV=MINPID=hvOUNHPWCVJMKQTDARSZFGLEBm:g:i:r:s:t:o:w:x:y:d:");
  args.printError(USAGE, true);
  if (args.getOpt('h') || args.getOpt("help")) {
     GMessage("%s",USAGE);
@@ -862,6 +866,9 @@ int main(int argc, char* argv[]) {
  altPhases=(args.getOpt('H')!=NULL);
  fmtGTF=(args.getOpt('T')!=NULL); //switch output format to GTF
  fmtBED=(args.getOpt("bed")!=NULL);
+ fmtBED=(args.getOpt("bed")!=NULL);
+ BEDinput=(args.getOpt("in-bed")!=NULL);
+ TABinput=(args.getOpt("in-tab")!=NULL);
  fmtTab=(args.getOpt("tab")!=NULL);
  bothStrands=(args.getOpt('B')!=NULL);
  fullCDSonly=(args.getOpt('J')!=NULL);
@@ -1027,6 +1034,11 @@ int main(int argc, char* argv[]) {
    gffloader.mergeCloseExons=mergeCloseExons;
    gffloader.showWarnings=(args.getOpt('E')!=NULL);
    gffloader.noPseudo=NoPseudo;
+   const char* fext=getFileExt(infile.chars());
+   if (BEDinput || (Gstricmp(fext, "bed")==0))
+	   gffloader.BEDinput=true;
+   if (TABinput || (Gstricmp(fext, "tab")==0))
+	   gffloader.TABinput=true;
    gffloader.load(g_data, &validateGffRec, doCluster, doCollapseRedundant,
                              matchAllIntrons, fuzzSpan, forceExons);
    if (doCluster)
