@@ -227,35 +227,33 @@ public:
         }
     }
 
-    void print(FILE *f, int idxfirstvalid, GStr& locname, GStr& loctrack, bool fmtGTF) {
+    void print(FILE *f, int idxfirstvalid, GStr& locname, GStr& loctrack) {
         const char* gseqname=NULL;
         if (rnas.Count()>0) gseqname=rnas[0]->getGSeqName();
         else gseqname=gfs[0]->getGSeqName();
-        if (!fmtGTF) {
-          fprintf(f,"%s\t%s\tlocus\t%d\t%d\t.\t%c\t.\tID=%s;locus=%s",
+        fprintf(f,"%s\t%s\tlocus\t%d\t%d\t.\t%c\t.\tID=%s;locus=%s",
                    gseqname, loctrack.chars(), this->start, this->end, this->strand,
                     locname.chars(), locname.chars());
-          //const char* loc_gname=loc.getGeneName();
-          if (this->gene_names.Count()>0) { //print all gene names associated to this locus
+        //const char* loc_gname=loc.getGeneName();
+        if (this->gene_names.Count()>0) { //print all gene names associated to this locus
              fprintf(f, ";genes=%s",this->gene_names.First()->name.chars());
              for (int i=1;i<this->gene_names.Count();i++) {
                fprintf(f, ",%s",this->gene_names[i]->name.chars());
-               }
              }
-          if (this->gene_ids.Count()>0) { //print all GeneIDs names associated to this locus
+        }
+        if (this->gene_ids.Count()>0) { //print all GeneIDs names associated to this locus
              fprintf(f, ";geneIDs=%s",this->gene_ids.First()->name.chars());
              for (int i=1;i<this->gene_ids.Count();i++) {
                fprintf(f, ",%s",this->gene_ids[i]->name.chars());
-               }
              }
-          if (idxfirstvalid>=0) {
+        }
+        if (idxfirstvalid>=0) {
             fprintf(f, ";transcripts=%s",this->rnas[idxfirstvalid]->getID());
             for (int i=idxfirstvalid+1;i<this->rnas.Count();i++) {
               fprintf(f, ",%s",this->rnas[i]->getID());
             }
-          }
-          fprintf(f, "\n");
         }
+        fprintf(f, "\n");
     }
 
     void addMerge(GffLocus& locus, GffObj* lnkrna) {
@@ -536,7 +534,7 @@ struct GffLoader {
   bool showWarnings;
   bool noPseudo;
   bool BEDinput;
-  bool TABinput;
+  bool TLFinput;
   bool placeGf(GffObj* t, GenomicSeqData* gdata, bool doCluster=true, bool collapseRedundant=true,
                                     bool matchAllIntrons=true, bool fuzzSpan=false);
   void load(GList<GenomicSeqData>&seqdata, GFValidateFunc* gf_validate=NULL,
@@ -552,7 +550,7 @@ struct GffLoader {
       showWarnings=false;
       noPseudo=false;
       BEDinput=false;
-      TABinput=false;
+      TLFinput=false;
       if (fname=="-" || fname=="stdin") {
          f=stdin;
          fname="stdin";

@@ -653,7 +653,7 @@ void GffLoader::load(GList<GenomicSeqData>& seqdata, GFValidateFunc* gf_validate
 	//           keepAttrs   mergeCloseExons  noExonAttr
 	gffr->set_gene2exon(gene2exon);
 	if (BEDinput) gffr->isBED(true);
-	if (TABinput) gffr->isTAB(true);
+	//if (TLFinput) gffr->isTLF(true);
 	gffr->readAll(this->fullAttributes,    this->mergeCloseExons,  this->noExonAttrs);
 	GVec<int> pseudoAttrIds;
 	GVec<int> pseudoFeatureIds;
