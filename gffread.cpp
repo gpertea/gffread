@@ -4,7 +4,7 @@
 #define __STDC_FORMAT_MACROS
 #include <inttypes.h>
 
-#define VERSION "0.10.3"
+#define VERSION "0.10.4"
 
 #define USAGE "gffread v" VERSION ". Usage:\n\
 gffread <input_gff> [-g <genomic_seqs_fasta> | <dir>][-s <seq_info.fsize>] \n\
@@ -626,18 +626,22 @@ bool process_transcript(GFastaDb& gfasta, GffObj& gffrec) {
 			 if (cdsaa==NULL) { //translate now if not done before
 			   cdsaa=translateDNA(cdsnt, aalen, seqlen);
 			   }
-			 if (fullattr && gffrec.attrs!=NULL) {
+			 if (gffrec.attrs!=NULL) {
 				 //append all attributes found for each transcripts
 				for (int i=0;i<gffrec.attrs->Count();i++) {
 				  defline.append(" ");
 				  defline.append(gffrec.getAttrName(i));
 				  defline.append("=");
-				  defline.append(gffrec.getAttrValue(i));
+				  char* s=gffrec.getAttrValue(i);
+				  if (s[0]=='"') defline.append(s);
+				  else defline.appendQuoted(s, '{', true);
 				}
 			 }
+			 /* partialness superseded this:
 			 if (validCDSonly && !fullattr && !fullCDS) {
 				defline.append(" [partial]");
 			 }
+			 */
 			 if (aalen>0) {
 			   if (cdsaa[aalen-1]=='.') --aalen; //avoid printing the final stop codon
 			   printFasta(f_y, defline, cdsaa, aalen, StarStop);
@@ -661,16 +665,18 @@ bool process_transcript(GFastaDb& gfasta, GffObj& gffrec) {
 					  defline+=(int)seglst[i]->end;
 					  }
 				  }
-			 if (fullattr && gffrec.attrs!=NULL) {
+			 if (gffrec.attrs!=NULL) {
 				 //append all attributes found for each transcript
-				  for (int i=0;i<gffrec.attrs->Count();i++) {
+				for (int i=0;i<gffrec.attrs->Count();i++) {
 					defline.append(" ");
 					defline.append(gffrec.getAttrName(i));
 					defline.append("=");
-					defline.append(gffrec.getAttrValue(i));
-					}
-				  }
-			 printFasta(f_x, defline, cdsnt, seqlen);
+					char* s=gffrec.getAttrValue(i);
+					if (s[0]=='"') defline.append(s);
+					else defline.appendQuoted(s, '{', true);
+				}
+			}
+			printFasta(f_x, defline, cdsnt, seqlen);
 	  }
 	  GFREE(cdsnt);
 	  GFREE(cdsaa);
@@ -700,6 +706,7 @@ bool process_transcript(GFastaDb& gfasta, GffObj& gffrec) {
                 defline.append("-");
                 defline+=(int)gffrec.exons[i]->end;
                 }
+        /*
         defline.append(" segs:");
         for (int i=0;i<seglst.Count();i++) {
             if (i>0) defline.append(",");
@@ -707,20 +714,23 @@ bool process_transcript(GFastaDb& gfasta, GffObj& gffrec) {
             defline.append("-");
             defline+=(int)seglst[i]->end;
             }
+       */
       }
-      if (fullattr && gffrec.attrs!=NULL) {
-       //append all attributes found for each transcripts
-        for (int i=0;i<gffrec.attrs->Count();i++) {
-          defline.append(" ");
-          defline.append(gffrec.getAttrName(i));
-          defline.append("=");
-          defline.append(gffrec.getAttrValue(i));
-          }
+      if (gffrec.attrs!=NULL) {
+    	  //append all attributes found for each transcripts
+    	  for (int i=0;i<gffrec.attrs->Count();i++) {
+    		  defline.append(" ");
+    		  defline.append(gffrec.getAttrName(i));
+    		  defline.append("=");
+    		  char* s=gffrec.getAttrValue(i);
+    		  if (s[0]=='"') defline.append(s);
+    		  else defline.appendQuoted(s, '{', true);
+    	  }
       }
       printFasta(f_w, defline, exont, seqlen);
       GFREE(exont);
-      }
-  } //writing f_w (spliced exons)
+   }
+ } //writing f_w (spliced exons)
 
    return true;
 }
@@ -744,10 +754,7 @@ void printGff3Header(FILE* f, GArgs& args) {
   args.printCmdLine(f);
   fprintf(f, "# gffread v" VERSION "\n");
   fprintf(f, "##gff-version 3\n");
-  //for (int i=0;i<gseqdata.Count();i++) {
-  //
-  //}
-  }
+}
 
 bool validateGffRec(GffObj* gffrec, GList<GffObj>* gfnew) {
 	if (reftbl.Count()>0) { //check if we need to reject by ref seq filter
