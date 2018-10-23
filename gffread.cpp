@@ -417,7 +417,6 @@ bool process_transcript(GFastaDb& gfasta, GffObj& gffrec) {
  //returns true if the transcript passed the filter
  char* gname=gffrec.getGeneName();
  if (gname==NULL) gname=gffrec.getGeneID();
- GStr defline(gffrec.getID());
  if (f_out) { //remove transcript_name
      const char* tname=NULL;
      if ((tname=gffrec.getAttr("transcript_name"))!=NULL &&
@@ -515,7 +514,7 @@ bool process_transcript(GFastaDb& gfasta, GffObj& gffrec) {
       if (verbose)
          GMessage("Unrecognized splice sites found for '%s'\n",gffrec.getID());
       return false; //don't print this one!
-      }
+    }
   }
   bool trprint=true;
   //int stopCodonAdjust=0;
@@ -532,7 +531,7 @@ bool process_transcript(GFastaDb& gfasta, GffObj& gffrec) {
   CDS_CHECK:
     cdsnt=gffrec.getSpliced(faseq, true, &seqlen, NULL, NULL, &seglst);
     //if (cdsnt==NULL) trprint=false;
-    if (cdsnt!=NULL) { //has CDS
+    if (cdsnt!=NULL && cdsnt[0]!='\0') { //has CDS
       //if (validCDSonly) {
          cdsaa=translateDNA(cdsnt, aalen, seqlen);
          char* p=strchr(cdsaa,'.');
@@ -598,6 +597,11 @@ bool process_transcript(GFastaDb& gfasta, GffObj& gffrec) {
         	 trprint=false;
          //} // Valid CDS only requested?
       } //has CDS
+    else {
+    	if (cdsnt[0]=='\0')
+    		GMessage("Warning: aberrant CDS %d-%d for transcript %s\n",
+    				gffrec.CDstart, gffrec.CDend, gffrec.getID());
+    }
   } //translation or codon check was requested
   if (!trprint) {
     GFREE(cdsnt);
@@ -626,6 +630,7 @@ bool process_transcript(GFastaDb& gfasta, GffObj& gffrec) {
 			 if (cdsaa==NULL) { //translate now if not done before
 			   cdsaa=translateDNA(cdsnt, aalen, seqlen);
 			   }
+			 GStr defline(gffrec.getID());
 			 if (gffrec.attrs!=NULL) {
 				 //append all attributes found for each transcripts
 				for (int i=0;i<gffrec.attrs->Count();i++) {
@@ -648,6 +653,7 @@ bool process_transcript(GFastaDb& gfasta, GffObj& gffrec) {
 			 }
 	  }
 	  if (f_x!=NULL) { //CDS only
+			 GStr defline(gffrec.getID());
 			 if (writeExonSegs) {
 				  defline.append(" loc:");
 				  defline.append(gffrec.getGSeqName());
@@ -682,31 +688,32 @@ bool process_transcript(GFastaDb& gfasta, GffObj& gffrec) {
 	  GFREE(cdsaa);
   } //writing CDS or its translation
   if (f_w!=NULL) { //write spliced exons
-      uint cds_start=0;
-      uint cds_end=0;
-      seglst.Clear();
-      char* exont=gffrec.getSpliced(faseq, false, &seqlen, &cds_start, &cds_end, &seglst);
-      if (exont!=NULL) {
-      if (gffrec.CDstart>0) {
-        defline.appendfmt(" CDS=%d-%d", cds_start, cds_end);
-      }
-      if (writeExonSegs) {
-        defline.append(" loc:");
-        defline.append(gffrec.getGSeqName());
-        defline+=(char)'|';
-        defline+=(int)gffrec.start;
-        defline+=(char)'-';
-        defline+=(int)gffrec.end;
-        defline+=(char)'|';
-        defline+=(char)gffrec.strand;
-        defline.append(" exons:");
-        for (int i=0;i<gffrec.exons.Count();i++) {
-                if (i>0) defline.append(",");
-                defline+=(int)gffrec.exons[i]->start;
-                defline.append("-");
-                defline+=(int)gffrec.exons[i]->end;
-                }
-        /*
+	  uint cds_start=0;
+	  uint cds_end=0;
+	  seglst.Clear();
+	  char* exont=gffrec.getSpliced(faseq, false, &seqlen, &cds_start, &cds_end, &seglst);
+	  GStr defline(gffrec.getID());
+	  if (exont!=NULL) {
+		  if (gffrec.CDstart>0) {
+			  defline.appendfmt(" CDS=%d-%d", cds_start, cds_end);
+		  }
+		  if (writeExonSegs) {
+			  defline.append(" loc:");
+			  defline.append(gffrec.getGSeqName());
+			  defline+=(char)'|';
+			  defline+=(int)gffrec.start;
+			  defline+=(char)'-';
+			  defline+=(int)gffrec.end;
+			  defline+=(char)'|';
+			  defline+=(char)gffrec.strand;
+			  defline.append(" exons:");
+			  for (int i=0;i<gffrec.exons.Count();i++) {
+				  if (i>0) defline.append(",");
+				  defline+=(int)gffrec.exons[i]->start;
+				  defline.append("-");
+				  defline+=(int)gffrec.exons[i]->end;
+			  }
+			  /*
         defline.append(" segs:");
         for (int i=0;i<seglst.Count();i++) {
             if (i>0) defline.append(",");
@@ -714,23 +721,23 @@ bool process_transcript(GFastaDb& gfasta, GffObj& gffrec) {
             defline.append("-");
             defline+=(int)seglst[i]->end;
             }
-       */
-      }
-      if (gffrec.attrs!=NULL) {
-    	  //append all attributes found for each transcripts
-    	  for (int i=0;i<gffrec.attrs->Count();i++) {
-    		  defline.append(" ");
-    		  defline.append(gffrec.getAttrName(i));
-    		  defline.append("=");
-    		  char* s=gffrec.getAttrValue(i);
-    		  if (s[0]=='"') defline.append(s);
-    		  else defline.appendQuoted(s, '{', true);
-    	  }
-      }
-      printFasta(f_w, defline, exont, seqlen);
-      GFREE(exont);
-   }
- } //writing f_w (spliced exons)
+			   */
+		  }
+		  if (gffrec.attrs!=NULL) {
+			  //append all attributes found for each transcripts
+			  for (int i=0;i<gffrec.attrs->Count();i++) {
+				  defline.append(" ");
+				  defline.append(gffrec.getAttrName(i));
+				  defline.append("=");
+				  char* s=gffrec.getAttrValue(i);
+				  if (s[0]=='"') defline.append(s);
+				  else defline.appendQuoted(s, '{', true);
+			  }
+		  }
+		  printFasta(f_w, defline, exont, seqlen);
+		  GFREE(exont);
+	  }
+  } //writing f_w (spliced exons)
 
    return true;
 }
