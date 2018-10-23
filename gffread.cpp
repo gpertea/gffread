@@ -525,7 +525,7 @@ bool process_transcript(GFastaDb& gfasta, GffObj& gffrec) {
   if (gffrec.CDphase=='1' || gffrec.CDphase=='2')
       mCDphase = gffrec.CDphase-'0';
   //CDS partialness only added when -y -x -V options are given
-  if (f_y!=NULL || f_x!=NULL || validCDSonly || addCDSattrs) {
+  if (gffrec.hasCDS() && (f_y!=NULL || f_x!=NULL || validCDSonly || addCDSattrs)) {
     int strandNum=0;
     int phaseNum=0;
   CDS_CHECK:
@@ -597,11 +597,6 @@ bool process_transcript(GFastaDb& gfasta, GffObj& gffrec) {
         	 trprint=false;
          //} // Valid CDS only requested?
       } //has CDS
-    else {
-    	if (cdsnt[0]=='\0')
-    		GMessage("Warning: aberrant CDS %d-%d for transcript %s\n",
-    				gffrec.CDstart, gffrec.CDend, gffrec.getID());
-    }
   } //translation or codon check was requested
   if (!trprint) {
     GFREE(cdsnt);
