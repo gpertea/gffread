@@ -517,6 +517,7 @@ bool process_transcript(GFastaDb& gfasta, GffObj& gffrec) {
     }
   }
   bool trprint=true;
+  bool inframeStop=false;
   //int stopCodonAdjust=0;
   int mCDphase=0;
   bool fullCDS=false;
@@ -560,13 +561,15 @@ bool process_transcript(GFastaDb& gfasta, GffObj& gffrec) {
                   */
               }
               else {//stop found before the last codon - not valid
-                  trprint=false;
+                  //trprint=false;
+            	  inframeStop=true;
               }
          }//stop codon found
-         if (trprint==false) { //failed CDS validity check
+         //if (trprint==false) { //failed CDS validity check
+         if (inframeStop) {
            //in-frame stop codon found
            if (altPhases && phaseNum<3) {
-              phaseNum++;
+              phaseNum++; //try a different phase
               gffrec.CDphase = '0'+((mCDphase+phaseNum)%3);
               GFREE(cdsaa);
               goto CDS_CHECK;
@@ -583,17 +586,19 @@ bool process_transcript(GFastaDb& gfasta, GffObj& gffrec) {
            if (verbose) GMessage("In-frame STOP found for '%s'\n",gffrec.getID());
            gffrec.addAttr("InFrameStop", "true");
          } //has in-frame STOP
-         bool hasStart=(cdsaa[0]=='M'); //could be a
-         fullCDS=(endStop && hasStart);
-         if (!fullCDS) {
-        	 const char* partialness=NULL;
-        	 if (hasStart) partialness="3";
-        	 else {
-        		partialness = endStop ? "5" : "5_3";
-        	 }
-        	 gffrec.addAttr("partialness", partialness);
+         if (!inframeStop) {
+			 bool hasStart=(cdsaa[0]=='M'); //could be a
+			 fullCDS=(endStop && hasStart);
+			 if (!fullCDS) {
+				 const char* partialness=NULL;
+				 if (hasStart) partialness="3";
+				 else {
+					partialness = endStop ? "5" : "5_3";
+				 }
+				 gffrec.addAttr("partialness", partialness);
+			 }
          }
-         if (trprint && fullCDSonly && !fullCDS)
+         if (trprint && ((fullCDSonly && !fullCDS) || (validCDSonly && inframeStop)) )
         	 trprint=false;
          //} // Valid CDS only requested?
       } //has CDS
@@ -620,7 +625,7 @@ bool process_transcript(GFastaDb& gfasta, GffObj& gffrec) {
   }
   if (adjstop!=NULL) delete adjstop;
   */
-  if (cdsnt!=NULL) {
+  if (cdsnt!=NULL && !inframeStop) {
 	  if (f_y!=NULL) { //CDS translation fasta output requested
 			 if (cdsaa==NULL) { //translate now if not done before
 			   cdsaa=translateDNA(cdsnt, aalen, seqlen);
