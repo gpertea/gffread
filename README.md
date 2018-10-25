@@ -13,6 +13,6 @@ library, [GCLib](../../../gclib). It can be done like this:
   git clone https://github.com/gpertea/gclib
   git clone https://github.com/gpertea/gffread
   cd gffread
-  make
+  make release
 ```
 This should build the **gffread** binary in the current directory.

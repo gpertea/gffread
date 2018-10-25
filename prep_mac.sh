@@ -3,17 +3,17 @@ ver=$(fgrep '#define VERSION ' gffread.cpp)
 ver=${ver#*\"}
 ver=${ver%%\"*}
 pack=gffread-$ver
-linpack=$pack.OSX_x86_64
-echo "preparing $linpack.tar.gz"
+macpack=$pack.OSX_x86_64
+echo "preparing $macpack.tar.gz"
 echo "-------------------"
-/bin/rm -rf $linpack
-/bin/rm -f $linpack.tar.gz
-mkdir $linpack
+/bin/rm -rf $macpack
+/bin/rm -f $macpack.tar.gz
+mkdir $macpack
 make clean
 make release
-cp gffread $linpack/
-tar cvfz $linpack.tar.gz $linpack
-ls -l $linpack.tar.gz
+cp gffread $macpack/
+tar cvfz $macpack.tar.gz $macpack
+ls -l $macpack.tar.gz
 #echo "If you're on igmN machines you can also update the web files:"
-echo "scp $linpack.tar.gz igm3:~/html/software/stringtie/dl/"
+echo "scp $macpack.tar.gz salz:~/html/software/stringtie/dl/"
 #echo "perl -i -pe 's/gffread\-\d\.\d+\.\d+\./gffread-$ver./g' ~/html/software/gffutils/home.shtml"

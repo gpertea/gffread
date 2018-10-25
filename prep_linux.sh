@@ -13,7 +13,7 @@ mkdir $linpack
 cd $srcpack
 make clean
 make release
-cp LICENSE gffread ../$linpack/
+cp LICENSE README.md gffread ../$linpack/
 cd ..
 tar cvfz $linpack.tar.gz $linpack
 ls -l $srcpack.tar.gz $linpack.tar.gz

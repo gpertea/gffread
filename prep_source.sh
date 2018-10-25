@@ -11,7 +11,7 @@ mkdir $pack
 mkdir $pack/gclib
 libdir=$pack/gclib/
 
-cp LICENSE gffread.cpp gff_utils.{h,cpp} $pack/
+cp LICENSE README.md gffread.cpp gff_utils.{h,cpp} $pack/
 sed 's|\.\./gclib|./gclib|' Makefile > $pack/Makefile
 
 cp ../gclib/{GVec,GList,GHash}.hh $libdir
