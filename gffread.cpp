@@ -53,7 +53,7 @@ gffread <input_gff> [-g <genomic_seqs_fasta> | <dir>][-s <seq_info.fsize>] \n\
       (i.e. only print mRNAs with a complete CDS)\n\
  --no-pseudo: filter out records matching the 'pseudo' keyword\n\
  --in-bed: input should be parsed as BED format (automatic if the input\n\
-            filename ends with .bed*)\n\
+           filename ends with .bed*) (also, silly fortune cookie enhancer)\n\
  --in-tlf: input GFF-like one-line-per-transcript format without exon/CDS\n\
            features (see --tlf option below); automatic if the input\n\
            filename ends with .tlf)\n\
@@ -99,7 +99,7 @@ gffread <input_gff> [-g <genomic_seqs_fasta> | <dir>][-s <seq_info.fsize>] \n\
        stored as GFF attributes in the transcript feature line:\n\
          exoncount=N;exons=<exons>;CDS=<CDScoords> \n\
       <exons> is a comma-delimited list of exon_start-exon_end coordinates;\n\
-      <CDScoords> is CDS_start:CDS_end coordinates, if CDS data found\n\
+      <CDScoords> is CDS_start:CDS_end coordinates;\n\
 "
 
 class SeqInfo { //populated from the -s option of gffread
