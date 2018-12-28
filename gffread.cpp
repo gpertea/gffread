@@ -46,6 +46,8 @@ gffread <input_gff> [-g <genomic_seqs_fasta> | <dir>][-s <seq_info.fsize>] \n\
       opposite strand (requires -g)\n\
  -P   add transcript level GFF attributes about the coding status of each\n\
       transcript, including partialness or in-frame stop codons (requires -g)\n\
+ --adj-stop stop codon adjustment: enables -P and performs automatic\n\
+      adjustment of the CDS stop coordinate if premature or downstream\n\
  -N   discard multi-exon mRNAs that have any intron with a non-canonical\n\
       splice site consensus (i.e. not GT-AG, GC-AG or AT-AC)\n\
  -J   discard any mRNAs that either lack initial START codon\n\
@@ -244,6 +246,7 @@ bool bothStrands=false; //for single-exon mRNA validation, check the other stran
 bool altPhases=false; //if original phase fails translation validation,
                      //try the other 2 phases until one makes it
 bool addCDSattrs=false;
+bool adjustStop=false; //automatic adjust the CDS stop coordinate
 bool covInfo=false; // --cov-info option -- report genome coverage per strand
 bool mRNAOnly=true;
 bool NoPseudo=false;
@@ -480,7 +483,7 @@ bool process_transcript(GFastaDb& gfasta, GffObj& gffrec) {
          return false;
      }
   }
-  GList<GSeg> seglst(false,true);
+  GMapSegments seglst(gffrec.strand);
   GFaSeqGet* faseq=NULL;
   if (f_x!=NULL || f_y!=NULL || f_w!=NULL || spliceCheck || validCDSonly || addCDSattrs) {
 	  faseq=fastaSeqGet(gfasta, gffrec.getGSeqName());
@@ -530,39 +533,36 @@ bool process_transcript(GFastaDb& gfasta, GffObj& gffrec) {
     int strandNum=0;
     int phaseNum=0;
   CDS_CHECK:
-    cdsnt=gffrec.getSpliced(faseq, true, &seqlen, NULL, NULL, &seglst);
-    //if (cdsnt==NULL) trprint=false;
+    uint cds_olen=0;
+    cdsnt=gffrec.getSpliced(faseq, true, &seqlen, NULL, &cds_olen, &seglst, adjustStop);
     if (cdsnt!=NULL && cdsnt[0]!='\0') { //has CDS
-      //if (validCDSonly) {
          cdsaa=translateDNA(cdsnt, aalen, seqlen);
          char* p=strchr(cdsaa,'.');
+         int cds_aalen=aalen;
+         if (adjustStop)
+        	 cds_aalen=cds_olen/3;
          endStop=false;
-         if (p!=NULL) {
-              //if (p-cdsaa>=aalen-2) { //stop found as the last OR prev-to-last codon
-        	 if (p-cdsaa==aalen-1) { //stop found as the last codon
+         if (p!=NULL) { //stop codon found
+        	 if (p-cdsaa==cds_aalen-1) { //stop found as the last CDS codon, as expected
                   *p='\0';//remove it
                   endStop=true;
-                  aalen--;
-                  /*
-                  if (p-cdsaa==aalen-2) {
-                    //previous to last codon is the stop codon
-                    //so correct the CDS stop accordingly
-                    //adjstop->apply(-3, true);
-                    if (seglst.Count()>0) seglst.Last()->end-=3;
-                    //stopCodonAdjust=0; //clear artificial stop adjustment
-                    seqlen-=3;
-                    cdsnt[seqlen]=0;
-                  }
-                  else {
-                	 //last codon is a stop codon
-                	 adjstop->apply(0, true);
-                  }
-                  aalen=p-cdsaa;
-                  */
+                  cds_aalen--;
               }
-              else {//stop found before the last codon - not valid
-                  //trprint=false;
-            	  inframeStop=true;
+              else {//stop found in a different position than the last codon
+            	  if (p-cdsaa<cds_aalen-1 && !adjustStop) {
+            		  inframeStop=true;
+            	  }
+            	  if (adjustStop) {
+            		  *p='\0';
+            		  cds_aalen=p-cdsaa+1;
+            		  seqlen=cds_aalen*3;
+            		  aalen=cds_aalen;
+            		  uint gc=seglst.gmap(seqlen);
+            		  if (gffrec.strand=='-') gffrec.CDstart=gc;
+            		  else gffrec.CDend=gc;
+            		  endStop=true;
+            		  //TODO: update seglst and gffrec.CDstart/end coordinate!
+            	  }
               }
          }//stop codon found
          //if (trprint==false) { //failed CDS validity check
@@ -573,7 +573,7 @@ bool process_transcript(GFastaDb& gfasta, GffObj& gffrec) {
               gffrec.CDphase = '0'+((mCDphase+phaseNum)%3);
               GFREE(cdsaa);
               goto CDS_CHECK;
-              }
+           }
            if (gffrec.exons.Count()==1 && bothStrands) {
               strandNum++;
               phaseNum=0;
@@ -581,13 +581,17 @@ bool process_transcript(GFastaDb& gfasta, GffObj& gffrec) {
                  GFREE(cdsaa);
                  gffrec.strand = (gffrec.strand=='-') ? '+':'-';
                  goto CDS_CHECK; //repeat the CDS check for a different frame
-                 }
               }
+           }
            if (verbose) GMessage("In-frame STOP found for '%s'\n",gffrec.getID());
            gffrec.addAttr("InFrameStop", "true");
+           if (adjustStop) {
+        	   gffrec.addAttr("CDStopAdjusted", "true");
+        	   inframeStop=false; //since we adjusted it, let's forget about it
+           }
          } //has in-frame STOP
          if (!inframeStop) {
-			 bool hasStart=(cdsaa[0]=='M'); //could be a
+			 bool hasStart=(cdsaa[0]=='M'); //for the regular eukaryotic translation table
 			 fullCDS=(endStop && hasStart);
 			 if (!fullCDS) {
 				 const char* partialness=NULL;
@@ -629,7 +633,7 @@ bool process_transcript(GFastaDb& gfasta, GffObj& gffrec) {
 	  if (f_y!=NULL) { //CDS translation fasta output requested
 			 if (cdsaa==NULL) { //translate now if not done before
 			   cdsaa=translateDNA(cdsnt, aalen, seqlen);
-			   }
+			 }
 			 GStr defline(gffrec.getID());
 			 if (gffrec.attrs!=NULL) {
 				 //append all attributes found for each transcripts
@@ -666,9 +670,9 @@ bool process_transcript(GFastaDb& gfasta, GffObj& gffrec) {
 				  defline.append(" segs:");
 				  for (int i=0;i<seglst.Count();i++) {
 					  if (i>0) defline.append(",");
-					  defline+=(int)seglst[i]->start;
+					  defline+=(int)seglst[i].start;
 					  defline.append("-");
-					  defline+=(int)seglst[i]->end;
+					  defline+=(int)seglst[i].end;
 					  }
 				  }
 			 if (gffrec.attrs!=NULL) {
@@ -713,15 +717,13 @@ bool process_transcript(GFastaDb& gfasta, GffObj& gffrec) {
 				  defline.append("-");
 				  defline+=(int)gffrec.exons[i]->end;
 			  }
-			  /*
-        defline.append(" segs:");
-        for (int i=0;i<seglst.Count();i++) {
-            if (i>0) defline.append(",");
-            defline+=(int)seglst[i]->start;
-            defline.append("-");
-            defline+=(int)seglst[i]->end;
-            }
-			   */
+			defline.append(" segs:");
+			for (int i=0;i<seglst.Count();i++) {
+				if (i>0) defline.append(",");
+				defline+=(int)seglst[i].start;
+				defline.append("-");
+				defline+=(int)seglst[i].end;
+				}
 		  }
 		  if (gffrec.attrs!=NULL) {
 			  //append all attributes found for each transcripts
@@ -855,7 +857,7 @@ void printGffObj(FILE* f, GffObj* gfo, GStr& locname, GffPrintMode exonPrinting,
 
 int main(int argc, char* argv[]) {
  GArgs args(argc, argv,
-   "version;debug;merge;bed;in-bed;tlf;in-tlf;cluster-only;nc;cov-info;help;force-exons;gene2exon;no-pseudo;MINCOV=MINPID=hvOUNHPWCVJMKQTDARSZFGLEBm:g:i:r:s:t:o:w:x:y:d:");
+   "version;debug;merge;adj-stop;bed;in-bed;tlf;in-tlf;cluster-only;nc;cov-info;help;force-exons;gene2exon;no-pseudo;MINCOV=MINPID=hvOUNHPWCVJMKQTDARSZFGLEBm:g:i:r:s:t:o:w:x:y:d:");
  args.printError(USAGE, true);
  if (args.getOpt('h') || args.getOpt("help")) {
     GMessage("%s",USAGE);
@@ -872,6 +874,8 @@ int main(int argc, char* argv[]) {
  wCDSonly=(args.getOpt('C')!=NULL);
  wNConly=(args.getOpt("nc")!=NULL);
  addCDSattrs=(args.getOpt('P')!=NULL);
+ adjustStop=(args.getOpt("adj-stop")!=NULL);
+ if (adjustStop) addCDSattrs=true;
  validCDSonly=(args.getOpt('V')!=NULL);
  altPhases=(args.getOpt('H')!=NULL);
  fmtGTF=(args.getOpt('T')!=NULL); //switch output format to GTF
