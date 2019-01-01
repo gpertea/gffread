@@ -535,18 +535,24 @@ bool process_transcript(GFastaDb& gfasta, GffObj& gffrec) {
   CDS_CHECK:
     uint cds_olen=0;
     cdsnt=gffrec.getSpliced(faseq, true, &seqlen, NULL, &cds_olen, &seglst, adjustStop);
+    //if adjustStop, seqlen has the CDS+3'UTR length, but cds_olen still has the original CDS length
     if (cdsnt!=NULL && cdsnt[0]!='\0') { //has CDS
          cdsaa=translateDNA(cdsnt, aalen, seqlen);
          char* p=strchr(cdsaa,'.');
          int cds_aalen=aalen;
          if (adjustStop)
-        	 cds_aalen=cds_olen/3;
+        	 cds_aalen=cds_olen/3; //originally stated CDS length
          endStop=false;
          if (p!=NULL) { //stop codon found
-        	 if (p-cdsaa==cds_aalen-1) { //stop found as the last CDS codon, as expected
+        	 if (p-cdsaa==cds_aalen-1) { //stop found as the stated last CDS codon
                   *p='\0';//remove it
                   endStop=true;
+                  if (adjustStop) {
+                	  seqlen=cds_aalen*3;
+                	  aalen=cds_aalen;
+                  }
                   cds_aalen--;
+                  //no need to adjust stop codon
               }
               else {//stop found in a different position than the last codon
             	  if (p-cdsaa<cds_aalen-1 && !adjustStop) {
@@ -554,7 +560,7 @@ bool process_transcript(GFastaDb& gfasta, GffObj& gffrec) {
             	  }
             	  if (adjustStop) {
             		  *p='\0';
-            		  cds_aalen=p-cdsaa+1;
+            		  cds_aalen=p-cdsaa+1; //adjusted CDS length
             		  seqlen=cds_aalen*3;
             		  aalen=cds_aalen;
             		  uint gc=seglst.gmap(seqlen);
