@@ -525,6 +525,7 @@ bool process_transcript(GFastaDb& gfasta, GffObj& gffrec) {
   int mCDphase=0;
   bool fullCDS=false;
   bool endStop=false;
+  bool stopAdjusted=false;
   if (addCDSattrs && gffrec.hasCDS()) gffrec.addAttr("hasCDS", "true");
   if (gffrec.CDphase=='1' || gffrec.CDphase=='2')
       mCDphase = gffrec.CDphase-'0';
@@ -567,7 +568,7 @@ bool process_transcript(GFastaDb& gfasta, GffObj& gffrec) {
             		  if (gffrec.strand=='-') gffrec.CDstart=gc;
             		  else gffrec.CDend=gc;
             		  endStop=true;
-            		  //TODO: update seglst and gffrec.CDstart/end coordinate!
+            		  stopAdjusted=true;
             	  }
               }
          }//stop codon found
@@ -591,11 +592,11 @@ bool process_transcript(GFastaDb& gfasta, GffObj& gffrec) {
            }
            if (verbose) GMessage("In-frame STOP found for '%s'\n",gffrec.getID());
            gffrec.addAttr("InFrameStop", "true");
-           if (adjustStop) {
-        	   gffrec.addAttr("CDStopAdjusted", "true");
-        	   inframeStop=false; //since we adjusted it, let's forget about it
-           }
          } //has in-frame STOP
+         if (stopAdjusted) {
+      	   gffrec.addAttr("CDStopAdjusted", "true");
+      	   inframeStop=false; //pretend it's OK now that we've adjusted it
+         }
          if (!inframeStop) {
 			 bool hasStart=(cdsaa[0]=='M'); //for the regular eukaryotic translation table
 			 fullCDS=(endStop && hasStart);
