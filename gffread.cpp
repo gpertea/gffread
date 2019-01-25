@@ -124,23 +124,23 @@ class SeqInfo { //populated from the -s option of gffread
 struct CStopAdjData {
 	int gseqlen;
 	GffObj* t;
-	int CDS_shift;
+	int CDS_adjust;
 	int exon_shift;
 	CStopAdjData(uint glen=0, GffObj* gfo=NULL):gseqlen(glen), t(gfo),
-		CDS_shift(0), exon_shift(0) {
+		CDS_adjust(0), exon_shift(0) {
 	}
-	int apply(int cdshift, bool reset=false) {
-		if (cdshift==0) {
+	int apply(int cdsadj, bool reset=false) {
+		if (cdsadj==0) {
 			if (reset) {
-				CDS_shift=0;
+				CDS_adjust=0;
 				exon_shift=0;
 			}
 			return 0;
 		}
 		if (t->strand=='-') {
-		  if (cdshift>0 && (int)t->CDstart>cdshift) {
-			  CDS_shift+=cdshift;
-			  t->CDstart-=cdshift;
+		  if (cdsadj>0 && (int)t->CDstart>cdsadj) {
+			  CDS_adjust+=cdsadj;
+			  t->CDstart-=cdsadj;
 			  if (t->exons.First()->start>t->CDstart) {
 				  int eshift=t->exons.First()->start-t->CDstart;
 				  exon_shift+=eshift;
@@ -149,10 +149,10 @@ struct CStopAdjData {
 				  t->covlen+=eshift;
 			  }
 		  }
-		  else if (cdshift<0) { //shrinking CDS
+		  else if (cdsadj<0) { //shrinking CDS
 			   //only used in order to undo a previous expansion
-               CDS_shift+=cdshift;
-               t->CDstart-=cdshift;
+               CDS_adjust+=cdsadj;
+               t->CDstart-=cdsadj;
                if (exon_shift>0) { //undo previous expansion
             	   int eshift=-exon_shift;
             	   t->exons.First()->start-=eshift;
@@ -163,9 +163,9 @@ struct CStopAdjData {
 		  }
 		}
 		else { //forward strand
-		  if (cdshift>0 && (int)t->CDend+cdshift<=gseqlen) {
-			  CDS_shift+=cdshift;
-			  t->CDend+=cdshift;
+		  if (cdsadj>0 && (int)t->CDend+cdsadj<=gseqlen) {
+			  CDS_adjust+=cdsadj;
+			  t->CDend+=cdsadj;
 			  if (t->exons.Last()->end<t->CDend) {
 				  int eshift=t->CDend-t->exons.Last()->end;
 				  exon_shift+=eshift;
@@ -175,9 +175,9 @@ struct CStopAdjData {
 			  }
 
 		  }
-		  else if (cdshift<0) { //shrinking CDS
-              CDS_shift+=cdshift;
-              t->CDend+=cdshift;
+		  else if (cdsadj<0) { //shrinking CDS
+              CDS_adjust+=cdsadj;
+              t->CDend+=cdsadj;
               if (exon_shift>0) { //undo previous expansion
            	   int eshift=-exon_shift;
            	   t->exons.Last()->end+=eshift;
@@ -189,31 +189,31 @@ struct CStopAdjData {
 		}
 
 		if (reset) {
-			CDS_shift=0;
+			CDS_adjust=0;
 			exon_shift=0;
 		}
-		return CDS_shift;
+		return CDS_adjust;
 	}
 
 	int restore() {
-      if (CDS_shift==0) return 0;
-      int r=CDS_shift;
+      if (CDS_adjust==0) return 0;
+      int r=CDS_adjust;
 	  if (t->strand=='-') {
-		  t->CDstart+=CDS_shift;
+		  t->CDstart+=CDS_adjust;
 		  if (exon_shift!=0) {
 			t->exons.First()->start+=exon_shift;
 			t->covlen-=exon_shift;
 			t->start+=exon_shift;
 		  }
 	  } else {
-		  t->CDend-=CDS_shift;
+		  t->CDend-=CDS_adjust;
 		  if (exon_shift!=0) {
 			t->exons.Last()->end-=exon_shift;
 			t->covlen-=exon_shift;
 			t->end+=exon_shift;
 		  }
 	   }
-	  CDS_shift=0;
+	  CDS_adjust=0;
 	  exon_shift=0;
       return r;
 	}
