@@ -362,7 +362,7 @@ void preserveContainedCDS(GffObj* t, GffObj* tfrom) {
       t->CDend=tfrom->CDend;
    }
   else { //no CDS info on container, just copy it from the contained
-   t->addCDS(tfrom->CDstart, tfrom->CDend, tfrom->CDphase);
+   t->setCDS(tfrom->CDstart, tfrom->CDend, tfrom->CDphase);
    }
 }
 
@@ -654,7 +654,9 @@ void GffLoader::load(GList<GenomicSeqData>& seqdata, GFValidateFunc* gf_validate
 	gffr->set_gene2exon(gene2exon);
 	if (BEDinput) gffr->isBED(true);
 	//if (TLFinput) gffr->isTLF(true);
-	gffr->readAll(this->fullAttributes,    this->mergeCloseExons,  this->noExonAttrs);
+	gffr->mergingCloseExons(this->mergeCloseExons);
+	gffr->keepingAttrs(this->fullAttributes, this->noExonAttrs);
+	gffr->readAll();
 	GVec<int> pseudoAttrIds;
 	GVec<int> pseudoFeatureIds;
 	if (this->noPseudo) {
@@ -687,6 +689,7 @@ void GffLoader::load(GList<GenomicSeqData>& seqdata, GFValidateFunc* gf_validate
 			m->printGff(stdout);
 		}
 		*/
+		//FIXME: *_type=*_pseudogene
 		if (strcmp(m->getFeatureName(), "locus")==0 &&
 				m->getAttr("transcripts")!=NULL) {
 			continue; //discard locus meta-features
@@ -714,6 +717,7 @@ void GffLoader::load(GList<GenomicSeqData>& seqdata, GFValidateFunc* gf_validate
 			if (is_pseudo) continue;
 			//last resort:
 			//  scan all the attribute values for "pseudogene" keyword (NCBI does that for "product" attr)
+			/*
 			 if (m->attrs!=NULL) {
 				 for (int i=0;i<m->attrs->Count();++i) {
 					 GffAttr& a=*(m->attrs->Get(i));
@@ -723,7 +727,9 @@ void GffLoader::load(GList<GenomicSeqData>& seqdata, GFValidateFunc* gf_validate
 					 }
 				 }
 			 }
-			 if (is_pseudo) continue;
+
+			if (is_pseudo) continue;
+			*/
 
 		} //pseudogene detection requested
 		char* rloc=m->getAttr("locus");
