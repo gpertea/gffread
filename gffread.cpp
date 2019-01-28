@@ -843,7 +843,7 @@ void printGffObj(FILE* f, GffObj* gfo, GStr& locname, GffPrintMode exonPrinting,
     GTData* tdata=(GTData*)(t.uptr);
     if (tdata->replaced_by!=NULL || ((t.udata & 4)!=0)) return;
     if (t.exons.Count()==0 && t.children.Count()==0 && forceExons)
-      t.addExon(t.start,t.end);
+      t.addExonSegment(t.start,t.end);
     t.udata|=4;
     t.addAttr("locus", locname.chars());
     out_counter++;
@@ -1187,7 +1187,7 @@ int main(int argc, char* argv[]) {
               gfst.udata|=4;
               if (firstGff3Print) { printGff3Header(f_out, args);firstGff3Print=false; }
               if (gfst.exons.Count()==0 && gfst.children.Count()==0 && forceExons)
-               gfst.addExon(gfst.start,gfst.end);
+               gfst.addExonSegment(gfst.start,gfst.end);
               gfst.printGxf(f_out, exonPrinting, tracklabel, NULL, decodeChars);
             }
             ++gfs_i;
@@ -1223,7 +1223,7 @@ int main(int argc, char* argv[]) {
            gfst.udata|=4;
            if (firstGff3Print) { printGff3Header(f_out, args);firstGff3Print=false; }
            if (gfst.exons.Count()==0 && gfst.children.Count()==0 && forceExons)
-            gfst.addExon(gfst.start,gfst.end);
+            gfst.addExonSegment(gfst.start,gfst.end);
            gfst.printGxf(f_out, exonPrinting, tracklabel, NULL, decodeChars);
            }
          ++gfs_i;
