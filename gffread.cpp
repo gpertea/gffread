@@ -4,7 +4,7 @@
 #define __STDC_FORMAT_MACROS
 #include <inttypes.h>
 
-#define VERSION "0.10.4"
+#define VERSION "0.10.5"
 
 #define USAGE "gffread v" VERSION ". Usage:\n\
 gffread <input_gff> [-g <genomic_seqs_fasta> | <dir>][-s <seq_info.fsize>] \n\
@@ -553,6 +553,7 @@ bool process_transcript(GFastaDb& gfasta, GffObj& gffrec) {
                 	  aalen=cds_aalen;
                   }
                   cds_aalen--;
+                  aalen--;
                   //no need to adjust stop codon
               }
               else {//stop found in a different position than the last codon
@@ -659,7 +660,7 @@ bool process_transcript(GFastaDb& gfasta, GffObj& gffrec) {
 			 }
 			 */
 			 if (aalen>0) {
-			   if (cdsaa[aalen-1]=='.') --aalen; //avoid printing the final stop codon
+			   if (cdsaa[aalen-1]=='.' || cdsaa[aalen-1]=='\0') --aalen; //avoid printing the stop codon
 			   printFasta(f_y, defline, cdsaa, aalen, StarStop);
 			 }
 	  }
