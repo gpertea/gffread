@@ -592,10 +592,10 @@ bool process_transcript(GFastaDb& gfasta, GffObj& gffrec) {
               }
            }
            if (verbose) GMessage("In-frame STOP found for '%s'\n",gffrec.getID());
-           gffrec.addAttr("InFrameStop", "true");
+           if (addCDSattrs) gffrec.addAttr("InFrameStop", "true");
          } //has in-frame STOP
          if (stopAdjusted) {
-      	   gffrec.addAttr("CDStopAdjusted", "true");
+      	   if (addCDSattrs) gffrec.addAttr("CDStopAdjusted", "true");
       	   inframeStop=false; //pretend it's OK now that we've adjusted it
          }
          if (!inframeStop) {
@@ -607,7 +607,7 @@ bool process_transcript(GFastaDb& gfasta, GffObj& gffrec) {
 				 else {
 					partialness = endStop ? "5" : "5_3";
 				 }
-				 gffrec.addAttr("partialness", partialness);
+				 if (addCDSattrs) gffrec.addAttr("partialness", partialness);
 			 }
          }
          if (trprint && ((fullCDSonly && !fullCDS) || (validCDSonly && inframeStop)) )
@@ -637,7 +637,7 @@ bool process_transcript(GFastaDb& gfasta, GffObj& gffrec) {
   }
   if (adjstop!=NULL) delete adjstop;
   */
-  if (cdsnt!=NULL && !inframeStop) {
+  if (cdsnt!=NULL) { // && !inframeStop) {
 	  if (f_y!=NULL) { //CDS translation fasta output requested
 			 if (cdsaa==NULL) { //translate now if not done before
 			   cdsaa=translateDNA(cdsnt, aalen, seqlen);
@@ -654,11 +654,6 @@ bool process_transcript(GFastaDb& gfasta, GffObj& gffrec) {
 				  else defline.appendQuoted(s, '{', true);
 				}
 			 }
-			 /* partialness superseded this:
-			 if (validCDSonly && !fullattr && !fullCDS) {
-				defline.append(" [partial]");
-			 }
-			 */
 			 if (aalen>0) {
 			   if (cdsaa[aalen-1]=='.' || cdsaa[aalen-1]=='\0') --aalen; //avoid printing the stop codon
 			   printFasta(f_y, defline, cdsaa, aalen, StarStop);
