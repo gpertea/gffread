@@ -352,18 +352,22 @@ void printLocus(GffLocus* loc, const char* pre) {
   GMessage("\n");
 }
 
-void preserveContainedCDS(GffObj* t, GffObj* tfrom) {
- //transfer CDS info to the container t if it's a larger protein
- if (tfrom->CDstart==0) return;
- if (t->CDstart) {
-   if (tfrom->CDstart<t->CDstart && tfrom->CDstart>=t->start)
-      t->CDstart=tfrom->CDstart;
-   if (tfrom->CDend>t->CDend && tfrom->CDend<=t->end)
-      t->CDend=tfrom->CDend;
-   }
-  else { //no CDS info on container, just copy it from the contained
-   t->addCDS(tfrom->CDstart, tfrom->CDend, tfrom->CDphase);
-   }
+void preserveContainedCDS(GffObj* tcontainer, GffObj* t) {
+ //transfer CDS info to the container if t has a larger protein (?)
+ if (!t->hasCDS()) return;
+ /*
+ if (tcontainer->CDstart) {
+	 if (t->CDend-t->CDstart>tcontainer->CDend-tcontainer->CDstart &&
+		t->CDstart>=tcontainer->start && t->CDend<=tcontainer->end ) {
+		 //this is wrong, larger genomic distance doesn't mean longer protein!
+		 tcontainer->CDstart=t->CDstart;
+		 tcontainer->CDend=t->CDend;
+	 }
+  }
+  */
+  //else {
+ if (!tcontainer->hasCDS())//no CDS info on container, just copy it from the contained
+   tcontainer->addCDS(t->CDstart, t->CDend, t->CDphase);
 }
 
 bool exonOverlap2Gene(GffObj* t, GffObj& g) {
