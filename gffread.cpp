@@ -31,8 +31,8 @@ gffread <input_gff> [-g <genomic_seqs_fasta> | <dir>][-s <seq_info.fsize>] \n\
  -C   coding only: discard mRNAs that have no CDS features\n\
  --nc non-coding only: discard mRNAs that have CDS features\n\
  -F   full GFF attribute preservation (all attributes are shown)\n\
- -G   only parse additional exon attributes from the first exon\n\
-      and move them to the mRNA level (useful for GTF input)\n\
+ -G   gather additional GFF exon attributes and move them to the\n\
+      transcript level\n\
  -A   use the description field from <seq_info.fsize> and add it\n\
       as the value for a 'descr' attribute to the GFF record\n\
  \n\
@@ -256,7 +256,9 @@ bool decodeChars=false; //decode url-encoded chars in attrs (-D)
 bool StarStop=false; //use * instead of . for stop codon translation
 
 bool fullCDSonly=false; // starts with START, ends with STOP codon
-bool fullattr=false;
+bool fullattr=false; //-F
+bool gatherExonAttrs=false; //-G
+
 //bool sortByLoc=false; // if the GFF output should be sorted by location
 bool ensembl_convert=false; //-L, assist in converting Ensembl GTF to GFF3
 bool BEDinput=false;
@@ -279,7 +281,6 @@ char rfltStrand=0;
 uint rfltStart=0;
 uint rfltEnd=MAX_UINT;
 bool rfltWithin=false; //check for full containment within given range
-bool noExonAttr=false;
 
 bool doCluster=false;
 bool doCollapseRedundant=false;
@@ -928,19 +929,19 @@ int main(int argc, char* argv[]) {
  }
  fullattr=(args.getOpt('F')!=NULL);
  if (args.getOpt('G')==NULL)
-    noExonAttr=!fullattr;
+    gatherExonAttrs=!fullattr;
    else {
-     noExonAttr=true;
+     gatherExonAttrs=true;
      fullattr=true;
      }
  if (NoPseudo && !fullattr) {
-	 noExonAttr=true;
+	 gatherExonAttrs=true;
 	 fullattr=true;
  }
  ensembl_convert=(args.getOpt('L')!=NULL);
  if (ensembl_convert) {
     fullattr=true;
-    noExonAttr=false;
+    gatherExonAttrs=false;
     //sortByLoc=true;
     }
 
@@ -1048,7 +1049,7 @@ int main(int argc, char* argv[]) {
    gffloader.transcriptsOnly=mRNAOnly;
    gffloader.gene2exon=gene2exon;
    gffloader.fullAttributes=fullattr;
-   gffloader.noExonAttrs=noExonAttr;
+   gffloader.gatherExonAttrs=gatherExonAttrs;
    gffloader.mergeCloseExons=mergeCloseExons;
    gffloader.showWarnings=(args.getOpt('E')!=NULL);
    gffloader.noPseudo=NoPseudo;

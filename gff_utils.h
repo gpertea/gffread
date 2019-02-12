@@ -527,7 +527,7 @@ struct GffLoader {
   bool transcriptsOnly;
   bool gene2exon;
   bool fullAttributes;
-  bool noExonAttrs;
+  bool gatherExonAttrs;
   bool mergeCloseExons;
   bool showWarnings;
   bool noPseudo;
@@ -543,7 +543,7 @@ struct GffLoader {
       transcriptsOnly=true;
       gene2exon=false;
       fullAttributes=false;
-      noExonAttrs=false;
+      gatherExonAttrs=false;
       mergeCloseExons=false;
       showWarnings=false;
       noPseudo=false;
