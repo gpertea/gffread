@@ -21,10 +21,15 @@ CXXFLAGS := $(if $(CXXFLAGS),$(BASEFLAGS) $(CXXFLAGS),$(BASEFLAGS))
 
 ifneq (,$(filter %release %static, $(MAKECMDGOALS)))
   # -- release build
-  #RELEASE_BUILD := 1
   CXXFLAGS := -g -O3 -DNDEBUG $(CXXFLAGS)
 else
-  CXXFLAGS += -g -O0 -DDEBUG -D_DEBUG -DGDEBUG
+  ifneq (,$(filter %profile %gprof %prof, $(MAKECMDGOALS)))
+    CXXFLAGS += -pg -O0 -DNDEBUG
+    LDFLAGS += -pg
+  else
+    CXXFLAGS += -g -O0 -DNDEBUG
+    #CXXFLAGS += -g -O0 -DDEBUG -D_DEBUG -DGDEBUG
+  endif
   ifneq (,$(filter %memcheck %memdebug, $(MAKECMDGOALS)))
      #use sanitizer in gcc 4.9+
      MEMCHECK_BUILD := 1
@@ -70,7 +75,7 @@ OBJS := ${GCLDIR}/GBase.o ${GCLDIR}/GArgs.o ${GCLDIR}/GFaSeqGet.o \
 .PHONY : all
 
 nodebug: release
-all release debug memcheck memdebug: gffread
+all release debug memcheck memdebug profile gprof prof: gffread
 
 $(OBJS) : $(GCLDIR)/GBase.h $(GCLDIR)/gff.h
 gffread.o : gff_utils.h $(GCLDIR)/GBase.h $(GCLDIR)/gff.h
