@@ -250,6 +250,7 @@ public:
         if (idxfirstvalid>=0) {
             fprintf(f, ";transcripts=%s",this->rnas[idxfirstvalid]->getID());
             for (int i=idxfirstvalid+1;i<this->rnas.Count();i++) {
+              if (this->rnas[i]==NULL) continue; //FIXME
               fprintf(f, ",%s",this->rnas[i]->getID());
             }
         }

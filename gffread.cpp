@@ -835,6 +835,7 @@ bool validateGffRec(GffObj* gffrec, GList<GffObj>* gfnew) {
 }
 
 void printGffObj(FILE* f, GffObj* gfo, GStr& locname, GffPrintMode exonPrinting, int& out_counter) {
+    if (gfo==NULL) return; //FIXME
     GffObj& t=*gfo;
     GTData* tdata=(GTData*)(t.uptr);
     if (tdata->replaced_by!=NULL || ((t.udata & 4)!=0)) return;
@@ -1103,6 +1104,7 @@ int main(int argc, char* argv[]) {
        int numvalid=0;
        int idxfirstvalid=-1;
        for (int i=0;i<loc.rnas.Count();i++) {
+         if (loc.rnas[i]==NULL) continue; //FIXME!
          GffObj& t=*(loc.rnas[i]);
          GTData* tdata=(GTData*)(t.uptr);
          if (tdata->replaced_by!=NULL) {
@@ -1175,6 +1177,7 @@ int main(int argc, char* argv[]) {
      GenomicSeqData* gdata=g_data[g];
      int gfs_i=0;
      for (int m=0;m<gdata->rnas.Count();m++) {
+        if (gdata->rnas[m]==NULL) continue; //FIXME
         GffObj& t=*(gdata->rnas[m]);
         if (f_out) {
          while (gfs_i<gdata->gfs.Count() && gdata->gfs[gfs_i]->start<=t.start) {
