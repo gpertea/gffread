@@ -120,9 +120,7 @@ class CGeneSym {
  public:
   GStr name;
   int freq;
-  CGeneSym(const char* n=NULL, int f=0):name(n) {
-    freq=f;
-    }
+  CGeneSym(const char* n=NULL, int f=0):name(n), freq(f) { }
   bool operator<(CGeneSym& b) {
      return (freq==b.freq)? ( (name.length()==b.name.length()) ? (name<b.name) :
          (name.length()<b.name.length()) ) : ( freq>b.freq );
@@ -250,7 +248,6 @@ public:
         if (idxfirstvalid>=0) {
             fprintf(f, ";transcripts=%s",this->rnas[idxfirstvalid]->getID());
             for (int i=idxfirstvalid+1;i<this->rnas.Count();i++) {
-              if (this->rnas[i]==NULL) continue; //FIXME
               fprintf(f, ",%s",this->rnas[i]->getID());
             }
         }

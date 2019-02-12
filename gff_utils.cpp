@@ -560,9 +560,9 @@ void collectLocusData(GList<GenomicSeqData>& ref_data, bool covInfo) {
 				}
 			}
 			GHash<int> gnames(true); //gene names in this locus
-			GHash<int> geneids(true); //Entrez GeneID: numbers
+			//GHash<int> geneids(true); //Entrez GeneID: numbers
+			GHash<int> geneids(true);
 			for (int i=0;i<loc.rnas.Count();i++) {
-				if (loc.rnas[i]==NULL) continue; //FIXME
 				GffObj& t=*(loc.rnas[i]);
 				GStr gname(t.getGeneName());
 				if (!gname.is_empty()) {
@@ -572,9 +572,8 @@ void collectLocusData(GList<GenomicSeqData>& ref_data, bool covInfo) {
 					else gnames.Add(gname, new int(1));
 				}
 				GStr geneid(t.getGeneID());
-				if (!geneid.is_empty()) {
-					geneids.Add(geneid.chars(), new int(1));
-				}
+				if (!geneid.is_empty())
+					geneids.Add(geneid.chars());
 				//parse GeneID xrefs, if any (RefSeq):
 				/*
 				GStr xrefs(t.getAttr("xrefs"));
