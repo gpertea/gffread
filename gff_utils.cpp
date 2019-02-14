@@ -367,7 +367,8 @@ void preserveContainedCDS(GffObj* tcontainer, GffObj* t) {
   */
   //else {
  if (!tcontainer->hasCDS())//no CDS info on container, just copy it from the contained
-   tcontainer->setCDS(t->CDstart, t->CDend, t->CDphase);
+   //tcontainer->setCDS(t->CDstart, t->CDend, t->CDphase);
+	 tcontainer->setCDS(t);
 }
 
 bool exonOverlap2Gene(GffObj* t, GffObj& g) {
@@ -659,7 +660,7 @@ void GffLoader::load(GList<GenomicSeqData>& seqdata, GFValidateFunc* gf_validate
 	if (BEDinput) gffr->isBED(true);
 	//if (TLFinput) gffr->isTLF(true);
 	gffr->mergingCloseExons(this->mergeCloseExons);
-	gffr->keepingAttrs(this->fullAttributes, this->noExonAttrs);
+	gffr->keepingAttrs(this->fullAttributes, this->gatherExonAttrs);
 	gffr->readAll();
 	GVec<int> pseudoAttrIds;
 	GVec<int> pseudoFeatureIds;
