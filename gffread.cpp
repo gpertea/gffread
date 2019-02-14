@@ -247,7 +247,7 @@ bool altPhases=false; //if original phase fails translation validation,
                      //try the other 2 phases until one makes it
 bool addCDSattrs=false;
 bool adjustStop=false; //automatic adjust the CDS stop coordinate
-bool covInfo=false; // --cov-info option -- report genome coverage per strand
+bool covInfo=false; // --cov-info : only report genome coverage
 bool mRNAOnly=true;
 bool NoPseudo=false;
 bool forceExons=false;
@@ -917,7 +917,7 @@ int main(int argc, char* argv[]) {
       }
  }
  covInfo=(args.getOpt("cov-info"));
- if (covInfo) doCluster=true;
+ if (covInfo) doCluster=true; //need to collapse overlapping exons
  if (fullCDSonly) validCDSonly=true;
  if (verbose) {
      fprintf(stderr, "Command line was:\n");
