@@ -3,6 +3,7 @@
 #include <ctype.h>
 #define __STDC_FORMAT_MACROS
 #include <inttypes.h>
+
 #define VERSION "0.10.6"
 
 #define USAGE "gffread v" VERSION ". Usage:\n\
