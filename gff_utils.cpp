@@ -742,7 +742,7 @@ void GffLoader::load(GList<GenomicSeqData>& seqdata, GFValidateFunc* gf_validate
 			m->removeAttr("locus", rloc);
 		}
 		if (forceExons) {
-			m->exon_ftype_id=gff_fid_exon;
+			m->subftype_id=gff_fid_exon;
 		}
 		/*
 		if (forceExons || (m->isGene() && m->exons.Count()==0 && m->children.Count()==0)) {  // && m->children.Count()==0) {
