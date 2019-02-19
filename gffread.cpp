@@ -30,9 +30,8 @@ gffread <input_gff> [-g <genomic_seqs_fasta> | <dir>][-s <seq_info.fsize>] \n\
  -U   discard single-exon transcripts\n\
  -C   coding only: discard mRNAs that have no CDS features\n\
  --nc non-coding only: discard mRNAs that have CDS features\n\
- -F   full GFF attribute preservation (all attributes are shown)\n\
- -G   gather additional GFF exon attributes and move them to the\n\
-      transcript level\n\
+ -F   full GFF attribute preservation for GFF3 output\n\
+ -G   move exon attributes to the transcript level for GFF3 output\n\
  -A   use the description field from <seq_info.fsize> and add it\n\
       as the value for a 'descr' attribute to the GFF record\n\
  \n\
@@ -943,7 +942,7 @@ int main(int argc, char* argv[]) {
     fullattr=true;
     gatherExonAttrs=false;
     //sortByLoc=true;
-    }
+ }
 
  mergeCloseExons=(args.getOpt('Z')!=NULL);
  multiExon=(args.getOpt('U')!=NULL);

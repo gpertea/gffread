@@ -27,8 +27,8 @@ else
     CXXFLAGS += -pg -O0 -DNDEBUG
     LDFLAGS += -pg
   else
-    CXXFLAGS += -g -O0 -DNDEBUG
-    #CXXFLAGS += -g -O0 -DDEBUG -D_DEBUG -DGDEBUG
+    #CXXFLAGS += -g -O0 -DNDEBUG
+    CXXFLAGS += -g -O0 -DDEBUG -D_DEBUG -DGDEBUG
   endif
   ifneq (,$(filter %memcheck %memdebug, $(MAKECMDGOALS)))
      #use sanitizer in gcc 4.9+
