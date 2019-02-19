@@ -4,7 +4,7 @@
 #define __STDC_FORMAT_MACROS
 #include <inttypes.h>
 
-#define VERSION "0.10.6"
+#define VERSION "0.10.7"
 
 #define USAGE "gffread v" VERSION ". Usage:\n\
 gffread <input_gff> [-g <genomic_seqs_fasta> | <dir>][-s <seq_info.fsize>] \n\
@@ -119,7 +119,7 @@ class SeqInfo { //populated from the -s option of gffread
    GFREE(descr);
    }
 };
-
+/*
 struct CStopAdjData {
 	int gseqlen;
 	GffObj* t;
@@ -217,6 +217,7 @@ struct CStopAdjData {
       return r;
 	}
 };
+*/
 
 class RefTran {
  public:
