@@ -662,8 +662,10 @@ void GffLoader::load(GList<GenomicSeqData>& seqdata, GFValidateFunc* gf_validate
 	gffr->mergingCloseExons(this->mergeCloseExons);
 	gffr->keepingAttrs(this->fullAttributes, this->gatherExonAttrs);
 	gffr->readAll();
-	GVec<int> pseudoAttrIds;
-	GVec<int> pseudoFeatureIds;
+	GVec<int> pseudoFeatureIds; //feature type: pseudo*
+	GVec<int> pseudoAttrIds;  // attribute: [is]pseudo*=true/yes/1
+	GVec<int> pseudoTypeAttrIds;  // attribute: *_type=pseudo*
+
 	if (this->noPseudo) {
 		GffNameList& fnames = GffObj::names->feats; //gffr->names->feats;
 		for (int i=0;i<fnames.Count();i++) {
@@ -675,10 +677,15 @@ void GffLoader::load(GList<GenomicSeqData>& seqdata, GFValidateFunc* gf_validate
 		GffNameList& attrnames = GffObj::names->attrs;//gffr->names->attrs;
 		for (int i=0;i<attrnames.Count();i++) {
 			char* n=attrnames[i]->name;
+			if (endsiWith(n, "_type")) {
+				pseudoTypeAttrIds.Add(attrnames[i]->idx);
+			}// else {
 			char* p=strifind(n, "pseudo");
-			if (p==n || (p==n+2 && tolower(n[0])=='i' && tolower(n[1])=='s')) {
+			if (p==n || (p==n+2 && tolower(n[0])=='i' && tolower(n[1])=='s') ||
+					(p==n+3 && startsiWith(n, "is_")) ) {
 				pseudoAttrIds.Add(attrnames[i]->idx);
 			}
+			//}
 		}
 	}
 
@@ -688,13 +695,6 @@ void GffLoader::load(GList<GenomicSeqData>& seqdata, GFValidateFunc* gf_validate
 	//add to GenomicSeqData, adding to existing loci and identifying intron-chain duplicates
 	for (int k=0;k<gffr->gflst.Count();k++) {
 		GffObj* m=gffr->gflst[k];
-		/*
-		if (debugMode) {
-			fprintf(stdout, "##GffObj: %s:%d-%d\n", m->getID(), m->start, m->end);
-			m->printGff(stdout);
-		}
-		*/
-		//FIXME: *_type=*_pseudogene
 		if (strcmp(m->getFeatureName(), "locus")==0 &&
 				m->getAttr("transcripts")!=NULL) {
 			continue; //discard locus meta-features
@@ -720,22 +720,18 @@ void GffLoader::load(GList<GenomicSeqData>& seqdata, GFValidateFunc* gf_validate
 				}
 			}
 			if (is_pseudo) continue;
-			//last resort:
-			//  scan all the attribute values for "pseudogene" keyword (NCBI does that for "product" attr)
-			/*
-			 if (m->attrs!=NULL) {
-				 for (int i=0;i<m->attrs->Count();++i) {
-					 GffAttr& a=*(m->attrs->Get(i));
-					 if (strifind(a.attr_val, "pseudogene")) {
-						 is_pseudo=true;
-						 break;
-					 }
-				 }
-			 }
-
+			//FIXME: *_type=*_pseudogene
+            //find all attributes ending with _type and have value like: *_pseudogene
+			for (int i=0;i<pseudoTypeAttrIds.Count();++i) {
+				char* attrv=NULL;
+				if (m->attrs!=NULL) attrv=m->attrs->getAttr(pseudoTypeAttrIds[i]);
+				if (attrv!=NULL &&
+						(startsWith(attrv, "pseudogene") || endsWith(attrv, "_pseudogene")) ) {
+					is_pseudo=true;
+					break;
+				}
+			}
 			if (is_pseudo) continue;
-			*/
-
 		} //pseudogene detection requested
 		char* rloc=m->getAttr("locus");
 		if (rloc!=NULL && startsWith(rloc, "RLOC_")) {

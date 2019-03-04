@@ -4,7 +4,7 @@
 #define __STDC_FORMAT_MACROS
 #include <inttypes.h>
 
-#define VERSION "0.10.7"
+#define VERSION "0.10.8"
 
 #define USAGE "gffread v" VERSION ". Usage:\n\
 gffread <input_gff> [-g <genomic_seqs_fasta> | <dir>][-s <seq_info.fsize>] \n\
@@ -73,10 +73,10 @@ gffread <input_gff> [-g <genomic_seqs_fasta> | <dir>][-s <seq_info.fsize>] \n\
        \"exon\" features\n\
  --gene2exon: for single-line genes not parenting any transcripts, add an\n\
        exon feature spanning the entire gene (treat as transcript)\n\
- -E    expose (warn about) duplicate transcript IDs and other potential \n\
+ -E,-v expose (warn about) duplicate transcript IDs and other potential\n\
        problems with the given GFF/GTF records\n\
  -D    decode url encoded characters within attributes\n\
- -Z    merge close exons into a single exon (for intron size<4)\n\
+ -Z    merge close exons into a single exon (when intron size<4)\n\
  -w    write a fasta file with spliced exons for each GFF transcript\n\
  -x    write a fasta file with spliced CDS for each GFF transcript\n\
  -W    for -w and -x options, write in the FASTA defline the exon\n\
@@ -874,7 +874,7 @@ int main(int argc, char* argv[]) {
  mRNAOnly=(args.getOpt('O')==NULL);
  //sortByLoc=(args.getOpt('S')!=NULL);
  addDescr=(args.getOpt('A')!=NULL);
- verbose=(args.getOpt('v')!=NULL);
+ verbose=(args.getOpt('v')!=NULL || args.getOpt('E')!=NULL);
  wCDSonly=(args.getOpt('C')!=NULL);
  wNConly=(args.getOpt("nc")!=NULL);
  addCDSattrs=(args.getOpt('P')!=NULL);
@@ -1051,7 +1051,7 @@ int main(int argc, char* argv[]) {
    gffloader.fullAttributes=fullattr;
    gffloader.gatherExonAttrs=gatherExonAttrs;
    gffloader.mergeCloseExons=mergeCloseExons;
-   gffloader.showWarnings=(args.getOpt('E')!=NULL);
+   gffloader.showWarnings=verbose;
    gffloader.noPseudo=NoPseudo;
    const char* fext=getFileExt(infile.chars());
    if (BEDinput || (Gstricmp(fext, "bed")==0))
