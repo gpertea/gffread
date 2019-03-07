@@ -1,6 +1,6 @@
 #include "gff_utils.h"
 
-extern bool verbose;
+bool verbose=false; //same with GffReader::showWarnings and GffLoader::beVserbose
 
 //bool debugState=false;
 
@@ -377,8 +377,7 @@ bool exonOverlap2Gene(GffObj* t, GffObj& g) {
 	}
 	else return g.overlap(*t);
 }
-bool GffLoader::placeGf(GffObj* t, GenomicSeqData* gdata, bool doCluster, bool collapseRedundant,
-                                               bool matchAllIntrons, bool fuzzSpan) {
+bool GffLoader::placeGf(GffObj* t, GenomicSeqData* gdata) {
   bool keep=false;
   GTData* tdata=NULL;
   //int tidx=-1;
@@ -400,7 +399,7 @@ bool GffLoader::placeGf(GffObj* t, GenomicSeqData* gdata, bool doCluster, bool c
   	int gidx=gdata->gfs.Count()-1;
   	while (gidx>=0 && gdata->gfs[gidx]->end>=t->start) {
   		GffObj& g = *(gdata->gfs[gidx]);
-  		//find an container gene object for this transcript
+  		//find a container gene object for this transcript
   		//if (g.isGene() && t->strand==g.strand && exonOverlap2Gene(t, g)) {
   		if (g.isGene() && t->strand==g.strand && g.exons.Count()==0
   				  && t->start>=g.start && t->end<=g.end) {
@@ -412,16 +411,18 @@ bool GffLoader::placeGf(GffObj* t, GenomicSeqData* gdata, bool doCluster, bool c
   		       gdata->tdata.Add(tdata);
   			}
   			if (t->parent==NULL) t->parent=&g;
-  			//disable printing of gene if transcriptsOnly
-  			if (transcriptsOnly) {
+  			//disable printing of gene if transcriptsOnly and --keep-genes wasn't given
+  			if (transcriptsOnly && !keepGenes) {
   				g.udata|=4; //tag it as non-printable
+  				//keep gene ID and Name into transcript, when we don't print genes
+  	  			const char* geneName=g.getAttr("Name");
+  	  			if (t->getAttr("Name")==NULL && geneName) {
+  	  				t->addAttr("Name", geneName);
+  	  				if (t->getAttr("gene_name")==NULL)
+  	  					t->addAttr("gene_name", geneName);
+  	  			}
+  	  			t->addAttr("geneID", g.getID());
   			}
-  			const char* geneName=g.getAttr("Name");
-  			if (t->getAttr("Name")==NULL && geneName) {
-  				t->addAttr("Name", geneName);
-  				t->addAttr("gene_name", geneName);
-  			}
-  			t->addAttr("geneID", g.getID());
   			break;
   		}
   		--gidx;
@@ -649,18 +650,36 @@ void collectLocusData(GList<GenomicSeqData>& ref_data, bool covInfo) {
 	}//for each genomic sequence
 }
 
+void GffLoader::loadRefNames(GStr& flst) {
+ //load the whole file and split by (' \t\n\r,'
+	int64_t fsize=fileSize(flst.chars());
+	if (fsize<0) GError("Error: could not get file size for %s !\n",
+			flst.chars());
+	GStr slurp("", fsize+1);
+	//sanity check for file size?
+	FILE* f=fopen(flst.chars(), "r");
+	if (f==NULL)
+		GError("Error: could not open file %s !\n", flst.chars());
+	slurp.read(f, NULL);
+	fclose(f);
+	slurp.startTokenize(" ,;\t\r\n", tkCharSet);
+	GStr refname;
+	while (slurp.nextToken(refname)) {
+		if (refname.is_empty()) continue;
+		names->gseqs.addName(refname.chars());
+	}
+}
 
-void GffLoader::load(GList<GenomicSeqData>& seqdata, GFValidateFunc* gf_validate,
-                          bool doCluster, bool doCollapseRedundant,
-						  bool matchAllIntrons, bool fuzzSpan, bool forceExons) {
-	GffReader* gffr=new GffReader(f, this->transcriptsOnly, false); //not only mRNA features, not sorted
-	gffr->showWarnings(this->showWarnings);
+void GffLoader::load(GList<GenomicSeqData>& seqdata, GFValidateFunc* gf_validate) {
+	if (f==NULL) GError("Error: GffLoader::load() cannot be called before ::openFile()!\n");
+	GffReader* gffr=new GffReader(f, this->transcriptsOnly, true); //not only mRNA features, sorted
+	gffr->showWarnings(verbose);
 	//           keepAttrs   mergeCloseExons  noExonAttr
 	gffr->set_gene2exon(gene2exon);
 	if (BEDinput) gffr->isBED(true);
 	//if (TLFinput) gffr->isTLF(true);
-	gffr->mergingCloseExons(this->mergeCloseExons);
-	gffr->keepingAttrs(this->fullAttributes, this->gatherExonAttrs);
+	gffr->mergingCloseExons(mergeCloseExons);
+	gffr->keepingAttrs(fullAttributes, gatherExonAttrs);
 	gffr->readAll();
 	GVec<int> pseudoFeatureIds; //feature type: pseudo*
 	GVec<int> pseudoAttrIds;  // attribute: [is]pseudo*=true/yes/1
@@ -764,7 +783,7 @@ void GffLoader::load(GList<GenomicSeqData>& seqdata, GFValidateFunc* gf_validate
 			gdata=new GenomicSeqData(m->gseq_id);
 			seqdata.Add(gdata);
 		}
-		bool keep=placeGf(m, gdata, doCluster, doCollapseRedundant, matchAllIntrons, fuzzSpan);
+		bool keep=placeGf(m, gdata);
 		if (!keep) {
 			m->isUsed(false);
 			//DEBUG

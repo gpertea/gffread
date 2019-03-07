@@ -4,6 +4,7 @@
 #include "GStr.h"
 #include "GFaSeqGet.h"
 
+extern bool verbose;
 extern bool debugMode;
 
 typedef bool GFValidateFunc(GffObj* gf, GList<GffObj>* gfadd);
@@ -521,44 +522,73 @@ class GSpliceSite {
     }
 };
 
-struct GffLoader {
+class GffLoader {
+ public:
   GStr fname;
   FILE* f;
-  bool transcriptsOnly;
-  bool gene2exon;
-  bool fullAttributes;
-  bool gatherExonAttrs;
-  bool mergeCloseExons;
-  bool showWarnings;
-  bool noPseudo;
-  bool BEDinput;
-  bool TLFinput;
-  bool placeGf(GffObj* t, GenomicSeqData* gdata, bool doCluster=true, bool collapseRedundant=true,
-                                    bool matchAllIntrons=true, bool fuzzSpan=false);
-  void load(GList<GenomicSeqData>&seqdata, GFValidateFunc* gf_validate=NULL,
-                      bool doCluster=true, bool doCollapseRedundant=true,
-                      bool matchAllIntrons=true, bool fuzzSpan=false, bool forceExons=false);
-  GffLoader(const char* filename):fname(filename) {
-      f=NULL;
+  GffNames* names;
+  union {
+	  unsigned int options;
+	  struct {
+		bool transcriptsOnly:1;
+		bool gene2exon:1;
+		bool fullAttributes:1;
+		bool gatherExonAttrs:1;
+		bool mergeCloseExons:1;
+		bool noPseudo:1;
+		bool BEDinput:1;
+		bool TLFinput:1;
+		bool keepGenes:1;
+		bool sortRefsAlpha:1;
+		bool doCluster:1;
+		bool collapseRedundant:1;
+		bool matchAllIntrons:1;
+		bool fuzzSpan:1;
+		bool forceExons:1;
+	  };
+  };
+
+  GffLoader():fname(),f(NULL), names(NULL), options(0) {
       transcriptsOnly=true;
-      gene2exon=false;
-      fullAttributes=false;
-      gatherExonAttrs=false;
-      mergeCloseExons=false;
-      showWarnings=false;
-      noPseudo=false;
-      BEDinput=false;
-      TLFinput=false;
+      names=GffObj::names; //GFF dictionaries
+      gffnames_ref(names);
+  }
+
+  void loadRefNames(GStr& flst);
+
+  void openFile(GStr& file_name) {
+	  if (f!=NULL) closeFile();
+	  fname=file_name;
       if (fname=="-" || fname=="stdin") {
          f=stdin;
          fname="stdin";
-         }
-        else {
-          if ((f=fopen(fname.chars(), "r"))==NULL) {
-            GError("Error: cannot open gff file %s!\n",fname.chars());
-            }
-          }
       }
+      else {
+         if ((f=fopen(fname.chars(), "r"))==NULL) {
+           GError("Error: cannot open GFF file %s!\n",fname.chars());
+         }
+      }
+  }
+
+  void load(GList<GenomicSeqData>&seqdata, GFValidateFunc* gf_validate=NULL);
+
+  bool placeGf(GffObj* t, GenomicSeqData* gdata);
+
+  void closeFile() {
+	fname="";
+	if (f!=stdin) fclose(f);
+	f=NULL;
+  }
+
+  void terminate() {
+	  if (f!=NULL) closeFile();
+	  	  gffnames_unref(names);
+  }
+
+  ~GffLoader() {
+	  this->terminate();
+  }
+
 };
 
 void printFasta(FILE* f, GStr& defline, char* seq, int seqlen=-1, bool useStar=false);

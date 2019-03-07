@@ -4,24 +4,20 @@
 #define __STDC_FORMAT_MACROS
 #include <inttypes.h>
 
-#define VERSION "0.10.8"
+#define VERSION "0.10.9"
 
 #define USAGE "gffread v" VERSION ". Usage:\n\
 gffread <input_gff> [-g <genomic_seqs_fasta> | <dir>][-s <seq_info.fsize>] \n\
  [-o <outfile.gff>] [-t <tname>] [-r [[<strand>]<chr>:]<start>..<end> [-R]]\n\
  [-CTVNJMKQAFPGUBHZWTOLE] [-w <exons.fa>] [-x <cds.fa>] [-y <tr_cds.fa>]\n\
- [-i <maxintron>] \n\
- Filters and/or converts GFF3/GTF2 records.\n\
- <input_gff> is a GFF file, use '-' if the GFF records will be given at stdin\n\
+ [-i <maxintron>] [--sort-by <refseq_list.txt>] \n\
  \n\
- Options:\n\
- -g   full path to a multi-fasta file with the genomic sequences\n\
-      for all input mappings, OR a directory with single-fasta files\n\
-      (one per genomic sequence, with file names matching sequence names)\n\
- -s   <seq_info.fsize> is a tab-delimited file providing this info\n\
-      for each of the mapped sequences:\n\
-      <seq-name> <seq-length> <seq-description>\n\
-      (useful for -A option with mRNA/EST/protein mappings)\n\
+ Filter and convert GFF3/GTF2 records, extract corresponding sequences etc.\n\
+ By default (i.e. without -O) only process transcripts, ignore other features.\n\
+ \n\
+ <input_gff> is a GFF file, use '-' for stdin\n\
+ \n\
+Options:\n\
  -i   discard transcripts having an intron larger than <maxintron>\n\
  -r   only show transcripts overlapping coordinate range <start>..<end>\n\
       (on chromosome/contig <chr>, strand <strand> if provided)\n\
@@ -30,12 +26,22 @@ gffread <input_gff> [-g <genomic_seqs_fasta> | <dir>][-s <seq_info.fsize>] \n\
  -U   discard single-exon transcripts\n\
  -C   coding only: discard mRNAs that have no CDS features\n\
  --nc non-coding only: discard mRNAs that have CDS features\n\
- -F   full GFF attribute preservation for GFF3 output\n\
- -G   move exon attributes to the transcript level for GFF3 output\n\
  -A   use the description field from <seq_info.fsize> and add it\n\
       as the value for a 'descr' attribute to the GFF record\n\
- \n\
- -O   process also non-transcript GFF records (by default non-transcript\n\
+ -s   <seq_info.fsize> is a tab-delimited file providing this info\n\
+      for each of the mapped sequences:\n\
+      <seq-name> <seq-length> <seq-description>\n\
+      (useful for -A option with mRNA/EST/protein mappings)\n\
+Sorting: (by default, chromosomes are kept in the order they were found)\n\
+ --sort-alpha : chromosomes (reference sequences) are sorted alphabetically\n\
+ --sort-by : sort the reference sequences by the order in which their\n\
+      names are given in the <refseq.lst> file\n\
+Misc options: \n\
+ -F   full GFF attribute preservation\n\
+ -G   do not keep exon attributes, move them to the transcript feature\n\
+      (for GFF3 output)\n\
+ --keep-genes : in transcript-only mode (default), also preserve gene records\n\
+ -O   process other non-transcript GFF records (by default non-transcript\n\
       records are ignored)\n\
  -V   discard any mRNAs with CDS having in-frame stop codons (requires -g)\n\
  -H   for -V option, check and adjust the starting CDS phase\n\
@@ -54,11 +60,11 @@ gffread <input_gff> [-g <genomic_seqs_fasta> | <dir>][-s <seq_info.fsize>] \n\
       (i.e. only print mRNAs with a complete CDS)\n\
  --no-pseudo: filter out records matching the 'pseudo' keyword\n\
  --in-bed: input should be parsed as BED format (automatic if the input\n\
-           filename ends with .bed*) (also, silly fortune cookie enhancer)\n\
+           filename ends with .bed*)\n\
  --in-tlf: input GFF-like one-line-per-transcript format without exon/CDS\n\
            features (see --tlf option below); automatic if the input\n\
            filename ends with .tlf)\n\
- \n\
+Clustering:\n\
  -M/--merge : cluster the input transcripts into loci, collapsing matching\n\
        transcripts (those with the same exact introns and fully contained)\n\
  -d <dupinfo> : for -M option, write collapsing info to file <dupinfo>\n\
@@ -68,39 +74,42 @@ gffread <input_gff> [-g <genomic_seqs_fasta> | <dir>][-s <seq_info.fsize>] \n\
  -Q    for -M option, remove the containment restriction:\n\
        (multi-exon transcripts will be collapsed if just their introns match,\n\
        while single-exon transcripts can partially overlap (80%))\n\
- \n\
- --force-exons: make sure that the lowest level GFF features are printed as \n\
+Output options:\n\
+ --force-exons: make sure that the lowest level GFF features are considered\n\
        \"exon\" features\n\
  --gene2exon: for single-line genes not parenting any transcripts, add an\n\
-       exon feature spanning the entire gene (treat as transcript)\n\
- -E,-v expose (warn about) duplicate transcript IDs and other potential\n\
-       problems with the given GFF/GTF records\n\
+       exon feature spanning the entire gene (treat it as a transcript)\n\
  -D    decode url encoded characters within attributes\n\
- -Z    merge close exons into a single exon (when intron size<4)\n\
+ -Z    merge very close exons into a single exon (when intron size<4)\n\
+ -g   full path to a multi-fasta file with the genomic sequences\n\
+      for all input mappings, OR a directory with single-fasta files\n\
+      (one per genomic sequence, with file names matching sequence names)\n\
  -w    write a fasta file with spliced exons for each GFF transcript\n\
  -x    write a fasta file with spliced CDS for each GFF transcript\n\
+ -y    write a protein fasta file with the translation of CDS for each record\n\
  -W    for -w and -x options, write in the FASTA defline the exon\n\
        coordinates projected onto the spliced sequence;\n\
        for -y option, write transcript attributes in the FASTA defline\n\
- -y    write a protein fasta file with the translation of CDS for each record\n\
  -S    for -y option, use '*' instead of '.' as stop codon translation\n\
  -L    Ensembl GTF to GFF3 conversion (implies -F; should be used with -m)\n\
- -m    <chr_replace> is a reference (genomic) sequence replacement table with\n\
-       this format:\n\
+ -m    <chr_replace> is a name mapping table for converting reference \n\
+       sequence names, having this 2-column format:\n\
        <original_ref_ID> <new_ref_ID>\n\
-       GFF records on reference sequences that are not found among the\n\
-       <original_ref_ID> entries in this file will be filtered out\n\
- -o    the \"filtered\" GFF records will be written to <outfile.gff>\n\
-        (use -o- to enable printing to stdout)\n\
+       WARNING: all GFF records on reference sequences whose original IDs\n\
+       are not found in the 1st column of this table will be discarded!\n\
  -t    use <trackname> in the 2nd column of each GFF/GTF output line\n\
- -T    output GTF instead of GFF3 (for -o) \n\
- --bed output BED format instead of GFF3 (for -o)\n\
- --tlf for -o option, output transcripts in one-line transcript feature format\n\
-       which is the same with as a GFF but exon and CDS features are\n\
-       stored as GFF attributes in the transcript feature line:\n\
-         exoncount=N;exons=<exons>;CDS=<CDScoords> \n\
+ -o    print the GFF records to <outfile.gff> (those that passed any\n\
+       given filters). Use -o- to enable printing of to stdout\n\
+ -T    for -o, output will be GTF instead of GFF3\n\
+ --bed for -o, output BED format instead of GFF3\n\
+ --tlf for -o, output \"transcript line format\" which is like GFF\n\
+       but exons, CDS features and related data are stored as GFF \n\
+       attributes in the transcript feature line, like this:\n\
+         exoncount=N;exons=<exons>;CDSphase=<N>;CDS=<CDScoords> \n\
       <exons> is a comma-delimited list of exon_start-exon_end coordinates;\n\
-      <CDScoords> is CDS_start:CDS_end coordinates;\n\
+      <CDScoords> is CDS_start:CDS_end coordinates or a list like <exons>;\n\
+ -v,-E expose (warn about) duplicate transcript IDs and other potential\n\
+       problems with the given GFF/GTF records\n\
 "
 
 class SeqInfo { //populated from the -s option of gffread
@@ -119,105 +128,6 @@ class SeqInfo { //populated from the -s option of gffread
    GFREE(descr);
    }
 };
-/*
-struct CStopAdjData {
-	int gseqlen;
-	GffObj* t;
-	int CDS_adjust;
-	int exon_shift;
-	CStopAdjData(uint glen=0, GffObj* gfo=NULL):gseqlen(glen), t(gfo),
-		CDS_adjust(0), exon_shift(0) {
-	}
-	int apply(int cdsadj, bool reset=false) {
-		if (cdsadj==0) {
-			if (reset) {
-				CDS_adjust=0;
-				exon_shift=0;
-			}
-			return 0;
-		}
-		if (t->strand=='-') {
-		  if (cdsadj>0 && (int)t->CDstart>cdsadj) {
-			  CDS_adjust+=cdsadj;
-			  t->CDstart-=cdsadj;
-			  if (t->exons.First()->start>t->CDstart) {
-				  int eshift=t->exons.First()->start-t->CDstart;
-				  exon_shift+=eshift;
-				  t->exons.First()->start-=eshift;
-				  t->start-=eshift;
-				  t->covlen+=eshift;
-			  }
-		  }
-		  else if (cdsadj<0) { //shrinking CDS
-			   //only used in order to undo a previous expansion
-               CDS_adjust+=cdsadj;
-               t->CDstart-=cdsadj;
-               if (exon_shift>0) { //undo previous expansion
-            	   int eshift=-exon_shift;
-            	   t->exons.First()->start-=eshift;
-            	   t->start-=eshift;
-            	   t->covlen+=eshift;
-            	   exon_shift=0;
-               }
-		  }
-		}
-		else { //forward strand
-		  if (cdsadj>0 && (int)t->CDend+cdsadj<=gseqlen) {
-			  CDS_adjust+=cdsadj;
-			  t->CDend+=cdsadj;
-			  if (t->exons.Last()->end<t->CDend) {
-				  int eshift=t->CDend-t->exons.Last()->end;
-				  exon_shift+=eshift;
-				  t->exons.Last()->end+=eshift;
-				  t->end+=eshift;
-				  t->covlen+=eshift;
-			  }
-
-		  }
-		  else if (cdsadj<0) { //shrinking CDS
-              CDS_adjust+=cdsadj;
-              t->CDend+=cdsadj;
-              if (exon_shift>0) { //undo previous expansion
-           	   int eshift=-exon_shift;
-           	   t->exons.Last()->end+=eshift;
-           	   t->end+=eshift;
-           	   t->covlen+=eshift;
-           	   exon_shift=0;
-              }
-		  }
-		}
-
-		if (reset) {
-			CDS_adjust=0;
-			exon_shift=0;
-		}
-		return CDS_adjust;
-	}
-
-	int restore() {
-      if (CDS_adjust==0) return 0;
-      int r=CDS_adjust;
-	  if (t->strand=='-') {
-		  t->CDstart+=CDS_adjust;
-		  if (exon_shift!=0) {
-			t->exons.First()->start+=exon_shift;
-			t->covlen-=exon_shift;
-			t->start+=exon_shift;
-		  }
-	  } else {
-		  t->CDend-=CDS_adjust;
-		  if (exon_shift!=0) {
-			t->exons.Last()->end-=exon_shift;
-			t->covlen-=exon_shift;
-			t->end+=exon_shift;
-		  }
-	   }
-	  CDS_adjust=0;
-	  exon_shift=0;
-      return r;
-	}
-};
-*/
 
 class RefTran {
  public:
@@ -238,6 +148,7 @@ FILE* f_out=NULL;
 FILE* f_w=NULL; //fasta with spliced exons (transcripts)
 FILE* f_x=NULL; //fasta with spliced CDS
 FILE* f_y=NULL; //fasta with translated CDS
+
 bool wCDSonly=false;
 bool wNConly=false;
 
@@ -248,16 +159,22 @@ bool altPhases=false; //if original phase fails translation validation,
 bool addCDSattrs=false;
 bool adjustStop=false; //automatic adjust the CDS stop coordinate
 bool covInfo=false; // --cov-info : only report genome coverage
-bool mRNAOnly=true;
-bool NoPseudo=false;
+//bool transcriptsOnly=true;
+//bool keepGenes=false; //for transcriptsOnly
+
+//bool sortAlpha=false;
+GStr sortBy; //file name with chromosomes listed in the desired order
+//bool keepRefOrder=false; //sort within chromosomes, but follow the input chromosome order -- default!
+
+//bool NoPseudo=false;
 bool forceExons=false;
 bool spliceCheck=false; //only known splice-sites
 bool decodeChars=false; //decode url-encoded chars in attrs (-D)
 bool StarStop=false; //use * instead of . for stop codon translation
 
 bool fullCDSonly=false; // starts with START, ends with STOP codon
-bool fullattr=false; //-F
-bool gatherExonAttrs=false; //-G
+//bool fullattr=false; //-F
+//bool gatherExonAttrs=false; //-G
 
 //bool sortByLoc=false; // if the GFF output should be sorted by location
 bool ensembl_convert=false; //-L, assist in converting Ensembl GTF to GFF3
@@ -274,7 +191,7 @@ bool multiExon=false;
 bool writeExonSegs=false;
 char* tracklabel=NULL;
 int maxintron=999000000;
-bool mergeCloseExons=false;
+//bool mergeCloseExons=false;
 //range filter:
 char* rfltGSeq=NULL;
 char rfltStrand=0;
@@ -282,8 +199,7 @@ uint rfltStart=0;
 uint rfltEnd=MAX_UINT;
 bool rfltWithin=false; //check for full containment within given range
 
-bool doCluster=false;
-bool doCollapseRedundant=false;
+GffLoader gffloader;
 
 GList<GenomicSeqData> g_data(true,true,true); //list of GFF records by genomic seq
 
@@ -295,7 +211,7 @@ GHash<GeneInfo> gene_ids;
   //min-max gene span associated to chr|gene_id (mostly for Ensembl conversion)
 
 bool debugMode=false;
-bool verbose=false;
+//bool verbose=false;
 
 void loadSeqInfo(FILE* f, GHash<SeqInfo> &si) {
   GLineReader fr(f);
@@ -784,7 +700,7 @@ bool validateGffRec(GffObj* gffrec, GList<GffObj>* gfnew) {
 		}
 		else return false; //discard, ref seq not in the given translation table
 	}
-	if (mRNAOnly && gffrec->isDiscarded()) {
+	if (gffloader.transcriptsOnly && gffrec->isDiscarded()) {
 		//discard generic "locus" features with no other detailed subfeatures
 		//GMessage("Warning: discarding %s GFF generic gene/locus container %s\n",gffrec->getID());
 		return false;
@@ -861,17 +777,19 @@ void printGffObj(FILE* f, GffObj* gfo, GStr& locname, GffPrintMode exonPrinting,
 
 int main(int argc, char* argv[]) {
  GArgs args(argc, argv,
-   "version;debug;merge;adj-stop;bed;in-bed;tlf;in-tlf;cluster-only;nc;cov-info;help;force-exons;gene2exon;no-pseudo;MINCOV=MINPID=hvOUNHPWCVJMKQTDARSZFGLEBm:g:i:r:s:t:o:w:x:y:d:");
+   "version;debug;merge;adj-stop;bed;in-bed;tlf;in-tlf;cluster-only;nc;cov-info;help;"
+    "sort-alpha;keep-genes;force-exons;gene2exon;no-pseudo;sort-by=MINCOV=MINPID=hvOUNHPWCVJMKQTDARSZFGLEBm:g:i:r:s:t:o:w:x:y:d:");
  args.printError(USAGE, true);
  if (args.getOpt('h') || args.getOpt("help")) {
     GMessage("%s",USAGE);
     exit(1);
-    }
+ }
+
  debugMode=(args.getOpt("debug")!=NULL);
  decodeChars=(args.getOpt('D')!=NULL);
- forceExons=(args.getOpt("force-exons")!=NULL);
- NoPseudo=(args.getOpt("no-pseudo")!=NULL);
- mRNAOnly=(args.getOpt('O')==NULL);
+ gffloader.forceExons=(args.getOpt("force-exons")!=NULL);
+ gffloader.noPseudo=(args.getOpt("no-pseudo")!=NULL);
+ gffloader.transcriptsOnly=(args.getOpt('O')==NULL);
  //sortByLoc=(args.getOpt('S')!=NULL);
  addDescr=(args.getOpt('A')!=NULL);
  verbose=(args.getOpt('v')!=NULL || args.getOpt('E')!=NULL);
@@ -893,31 +811,42 @@ int main(int argc, char* argv[]) {
  fullCDSonly=(args.getOpt('J')!=NULL);
  spliceCheck=(args.getOpt('N')!=NULL);
  StarStop=(args.getOpt('S')!=NULL);
- bool gene2exon=(args.getOpt("gene2exon")!=NULL);
- bool matchAllIntrons=(args.getOpt('K')==NULL);
- bool fuzzSpan=(args.getOpt('Q')!=NULL);
+
+ gffloader.keepGenes=(args.getOpt("keep-genes")!=NULL);
+ gffloader.sortRefsAlpha=(args.getOpt("sort-alpha")!=NULL);
+ if (args.getOpt("sort-by")!=NULL) {
+	  if (gffloader.sortRefsAlpha)
+		  GError("Error: options --sort-by and --sort-alpha are mutually exclusive!\n");
+	 sortBy=args.getOpt("sort-by");
+ }
+ if (!sortBy.is_empty())
+	   gffloader.loadRefNames(sortBy);
+
+ gffloader.gene2exon=(args.getOpt("gene2exon")!=NULL);
+ gffloader.matchAllIntrons=(args.getOpt('K')==NULL);
+ gffloader.fuzzSpan=(args.getOpt('Q')!=NULL);
  if (args.getOpt('M') || args.getOpt("merge")) {
-    doCluster=true;
-    doCollapseRedundant=true;
+	 gffloader.doCluster=true;
+	 gffloader.collapseRedundant=true;
     }
    else {
-    if (!matchAllIntrons || fuzzSpan) {
+    if (!gffloader.matchAllIntrons || gffloader.fuzzSpan) {
       GMessage("%s",USAGE);
       GMessage("Error: -K or -Q options require -M/--merge option!\n");
       exit(1);
       }
     }
  if (args.getOpt("cluster-only")) {
-    doCluster=true;
-    doCollapseRedundant=false;
-    if (!matchAllIntrons || fuzzSpan) {
+	 gffloader.doCluster=true;
+	 gffloader.collapseRedundant=false;
+    if (!gffloader.matchAllIntrons || gffloader.fuzzSpan) {
       GMessage("%s",USAGE);
       GMessage("Error: -K or -Q options have no effect with --cluster-only.\n");
       exit(1);
       }
  }
  covInfo=(args.getOpt("cov-info"));
- if (covInfo) doCluster=true; //need to collapse overlapping exons
+ if (covInfo) gffloader.doCluster=true; //need to collapse overlapping exons
  if (fullCDSonly) validCDSonly=true;
  if (verbose) {
      fprintf(stderr, "Command line was:\n");
@@ -927,25 +856,25 @@ int main(int argc, char* argv[]) {
   GMessage(VERSION"\n");
   exit(0);
  }
- fullattr=(args.getOpt('F')!=NULL);
+ gffloader.fullAttributes=(args.getOpt('F')!=NULL);
  if (args.getOpt('G')==NULL)
-    gatherExonAttrs=!fullattr;
+	 gffloader.gatherExonAttrs=!gffloader.fullAttributes;
    else {
-     gatherExonAttrs=true;
-     fullattr=true;
+	   gffloader.gatherExonAttrs=true;
+	   gffloader.fullAttributes=true;
      }
- if (NoPseudo && !fullattr) {
-	 gatherExonAttrs=true;
-	 fullattr=true;
+ if (gffloader.noPseudo && !gffloader.fullAttributes) {
+	 gffloader.gatherExonAttrs=true;
+	 gffloader.fullAttributes=true;
  }
  ensembl_convert=(args.getOpt('L')!=NULL);
  if (ensembl_convert) {
-    fullattr=true;
-    gatherExonAttrs=false;
+    gffloader.fullAttributes=true;
+    gffloader.gatherExonAttrs=false;
     //sortByLoc=true;
  }
 
- mergeCloseExons=(args.getOpt('Z')!=NULL);
+ gffloader.mergeCloseExons=(args.getOpt('Z')!=NULL);
  multiExon=(args.getOpt('U')!=NULL);
  writeExonSegs=(args.getOpt('W')!=NULL);
  tracklabel=args.getOpt('t');
@@ -1045,24 +974,21 @@ int main(int argc, char* argv[]) {
                  else fclose(f_in);
           }
         else infile="-";
-   GffLoader gffloader(infile.chars());
-   gffloader.transcriptsOnly=mRNAOnly;
-   gffloader.gene2exon=gene2exon;
-   gffloader.fullAttributes=fullattr;
-   gffloader.gatherExonAttrs=gatherExonAttrs;
-   gffloader.mergeCloseExons=mergeCloseExons;
-   gffloader.showWarnings=verbose;
-   gffloader.noPseudo=NoPseudo;
+
    const char* fext=getFileExt(infile.chars());
    if (BEDinput || (Gstricmp(fext, "bed")==0))
 	   gffloader.BEDinput=true;
    if (TLFinput || (Gstricmp(fext, "tlf")==0))
 	   gffloader.TLFinput=true;
-   gffloader.load(g_data, &validateGffRec, doCluster, doCollapseRedundant,
-                             matchAllIntrons, fuzzSpan, forceExons);
-   if (doCluster)
+   gffloader.openFile(infile); //TODO: accept multiple files?
+
+   gffloader.load(g_data, &validateGffRec); // , doCluster, doCollapseRedundant,
+                             // matchAllIntrons, fuzzSpan, forceExons);
+
+   if (gffloader.doCluster)
      collectLocusData(g_data, covInfo);
    if (numfiles==0) break;
+   gffloader.closeFile();
    }
  if (covInfo) {
 	 //report coverage info at STDOUT
@@ -1075,9 +1001,9 @@ int main(int argc, char* argv[]) {
 		 u_bases+=g_data[g]->u_bases;
 	 }
 	 fprintf(stdout, "Total bases covered by transcripts:\n");
-	 fprintf(stdout, "\t%" PRIu64 " on + strand\n", f_bases);
-	 fprintf(stdout, "\t%" PRIu64 " on - strand\n", r_bases);
-	 fprintf(stdout, "\t%" PRIu64 " on . strand\n", u_bases);
+	 if (f_bases>0) fprintf(stdout, "\t%" PRIu64 " on + strand\n", f_bases);
+	 if (r_bases>0) fprintf(stdout, "\t%" PRIu64 " on - strand\n", r_bases);
+	 if (u_bases>0) fprintf(stdout, "\t%" PRIu64 " on . strand\n", u_bases);
  }
  GStr loctrack("gffcl");
  if (tracklabel) loctrack=tracklabel;
@@ -1093,7 +1019,7 @@ int main(int argc, char* argv[]) {
 	exonPrinting = forceExons ? pgffBoth : pgffAny;
  }
  bool firstGff3Print=fmtGFF3;
- if (doCluster) {
+ if (gffloader.doCluster) {
    //grouped in loci
    for (int g=0;g<g_data.Count();g++) {
      GenomicSeqData* gdata=g_data[g];
