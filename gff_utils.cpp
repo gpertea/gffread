@@ -1,6 +1,6 @@
 #include "gff_utils.h"
 
-extern bool verbose;
+bool verbose=false; //same with GffReader::showWarnings and GffLoader::beVserbose
 
 //bool debugState=false;
 
@@ -673,13 +673,13 @@ void GffLoader::loadRefNames(GStr& flst) {
 void GffLoader::load(GList<GenomicSeqData>& seqdata, GFValidateFunc* gf_validate) {
 	if (f==NULL) GError("Error: GffLoader::load() cannot be called before ::openFile()!\n");
 	GffReader* gffr=new GffReader(f, this->transcriptsOnly, true); //not only mRNA features, sorted
-	gffr->showWarnings(this->showWarnings);
+	gffr->showWarnings(verbose);
 	//           keepAttrs   mergeCloseExons  noExonAttr
 	gffr->set_gene2exon(gene2exon);
 	if (BEDinput) gffr->isBED(true);
 	//if (TLFinput) gffr->isTLF(true);
-	gffr->mergingCloseExons(this->mergeCloseExons);
-	gffr->keepingAttrs(this->fullAttributes, this->gatherExonAttrs);
+	gffr->mergingCloseExons(mergeCloseExons);
+	gffr->keepingAttrs(fullAttributes, gatherExonAttrs);
 	gffr->readAll();
 	GVec<int> pseudoFeatureIds; //feature type: pseudo*
 	GVec<int> pseudoAttrIds;  // attribute: [is]pseudo*=true/yes/1

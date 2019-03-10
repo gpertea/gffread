@@ -4,6 +4,7 @@
 #include "GStr.h"
 #include "GFaSeqGet.h"
 
+extern bool verbose;
 extern bool debugMode;
 
 typedef bool GFValidateFunc(GffObj* gf, GList<GffObj>* gfadd);
@@ -534,7 +535,6 @@ class GffLoader {
 		bool fullAttributes:1;
 		bool gatherExonAttrs:1;
 		bool mergeCloseExons:1;
-		bool showWarnings:1;
 		bool noPseudo:1;
 		bool BEDinput:1;
 		bool TLFinput:1;

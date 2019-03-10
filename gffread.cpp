@@ -211,7 +211,7 @@ GHash<GeneInfo> gene_ids;
   //min-max gene span associated to chr|gene_id (mostly for Ensembl conversion)
 
 bool debugMode=false;
-bool verbose=false;
+//bool verbose=false;
 
 void loadSeqInfo(FILE* f, GHash<SeqInfo> &si) {
   GLineReader fr(f);
@@ -975,13 +975,6 @@ int main(int argc, char* argv[]) {
           }
         else infile="-";
 
-   //gffloader.transcriptsOnly=transcriptsOnly;
-   //gffloader.gene2exon=gene2exon;
-   //gffloader.fullAttributes=fullattr;
-   //gffloader.gatherExonAttrs=gatherExonAttrs;
-   //gffloader.mergeCloseExons=mergeCloseExons;
-   //gffloader.showWarnings=verbose;
-   //gffloader.noPseudo=NoPseudo;
    const char* fext=getFileExt(infile.chars());
    if (BEDinput || (Gstricmp(fext, "bed")==0))
 	   gffloader.BEDinput=true;
