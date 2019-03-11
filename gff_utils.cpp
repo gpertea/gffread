@@ -670,16 +670,20 @@ void GffLoader::loadRefNames(GStr& flst) {
 	}
 }
 
-void GffLoader::load(GList<GenomicSeqData>& seqdata, GFValidateFunc* gf_validate) {
+void GffLoader::load(GList<GenomicSeqData>& seqdata, GFValidateFunc* gf_validate, GFFCommentParser* gf_parsecomment) {
 	if (f==NULL) GError("Error: GffLoader::load() cannot be called before ::openFile()!\n");
 	GffReader* gffr=new GffReader(f, this->transcriptsOnly, true); //not only mRNA features, sorted
+	clearHeaderLines();
 	gffr->showWarnings(verbose);
 	//           keepAttrs   mergeCloseExons  noExonAttr
-	gffr->set_gene2exon(gene2exon);
+	gffr->gene2Exon(gene2exon);
 	if (BEDinput) gffr->isBED(true);
 	//if (TLFinput) gffr->isTLF(true);
-	gffr->mergingCloseExons(mergeCloseExons);
-	gffr->keepingAttrs(fullAttributes, gatherExonAttrs);
+	gffr->mergeCloseExons(mergeCloseExons);
+	gffr->keepAttrs(fullAttributes, gatherExonAttrs);
+	gffr->keepGenes(keepGenes);
+	gffr->setRefAlphaSorted(this->sortRefsAlpha);
+	if (gf_parsecomment!=NULL) gffr->setCommentParser(gf_parsecomment);
 	gffr->readAll();
 	GVec<int> pseudoFeatureIds; //feature type: pseudo*
 	GVec<int> pseudoAttrIds;  // attribute: [is]pseudo*=true/yes/1
@@ -759,17 +763,6 @@ void GffLoader::load(GList<GenomicSeqData>& seqdata, GFValidateFunc* gf_validate
 		if (forceExons) {
 			m->subftype_id=gff_fid_exon;
 		}
-		/*
-		if (forceExons || (m->isGene() && m->exons.Count()==0 && m->children.Count()==0)) {  // && m->children.Count()==0) {
-			if (m->exons.Count()==0 && m->children.Count()==0) {
-					m->exon_ftype_id=gff_fid_exon;
-					//a non-mRNA feature with no subfeatures
-					//just so we get some sequence functions working, add a dummy "exon"-like subfeature here
-					//--this could be a single "pseudogene" entry or another gene defined without transcripts or exons
-					m->addExon(m->start,m->end);
-			  }
-		}
-		*/
 		//GList<GffObj> gfadd(false,false); -- for gf_validate()?
 		if (gf_validate!=NULL && !(*gf_validate)(m, NULL)) {
 			continue;

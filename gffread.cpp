@@ -116,17 +116,13 @@ class SeqInfo { //populated from the -s option of gffread
  public:
   int len;
   char* descr;
-  SeqInfo( int l, char* s) {
-   len=l;
-   if (s==NULL) {
-     descr=NULL;
-     }   else {
-     descr=Gstrdup(s);
-     }
-   }
+  SeqInfo( int l, char* s): len(l), descr(NULL) {
+    if (s!=NULL)
+      descr=Gstrdup(s);
+  }
   ~SeqInfo() {
-   GFREE(descr);
-   }
+    GFREE(descr);
+  }
 };
 
 class RefTran {
@@ -182,6 +178,7 @@ bool BEDinput=false;
 bool TLFinput=false;
 
 bool fmtGFF3=true; //default output: GFF3
+//other formats only make sens in transcriptOnly mode
 bool fmtGTF=false;
 bool fmtBED=false;
 bool fmtTLF=false;
@@ -334,10 +331,12 @@ int adjust_stopcodon(GffObj& gffrec, int adj, GList<GSeg>* seglst=NULL) {
  }
 
 bool process_transcript(GFastaDb& gfasta, GffObj& gffrec) {
+ if (!gffrec.isTranscript()) return false; //shouldn't call this function unless it's a transcript
  //returns true if the transcript passed the filter
  char* gname=gffrec.getGeneName();
  if (gname==NULL) gname=gffrec.getGeneID();
- if (f_out) { //remove transcript_name
+ /*
+ if (f_out) { //remove transcript_name, convert it to Name for GFF3 output -- should we?
      const char* tname=NULL;
      if ((tname=gffrec.getAttr("transcript_name"))!=NULL &&
     		 gffrec.getAttr("Name")==NULL) {
@@ -345,6 +344,7 @@ bool process_transcript(GFastaDb& gfasta, GffObj& gffrec) {
         gffrec.removeAttr("transcript_name");
      }
  }
+ */
  if (ensembl_convert && startsWith(gffrec.getID(), "ENS")) {
       const char* biotype=gffrec.getAttr("gene_biotype");
       if (biotype) {
@@ -660,7 +660,6 @@ bool process_transcript(GFastaDb& gfasta, GffObj& gffrec) {
 		  GFREE(exont);
 	  }
   } //writing f_w (spliced exons)
-
    return true;
 }
 
@@ -683,6 +682,16 @@ void printGff3Header(FILE* f, GArgs& args) {
   args.printCmdLine(f);
   fprintf(f, "# gffread v" VERSION "\n");
   fprintf(f, "##gff-version 3\n");
+}
+
+
+void processGffComment(const char* cmline) {
+ const char* p=cmline;
+ while (*p=='#') p++;
+ GStr s(p);
+ //TODO: this must be called after gffloader initialization
+ // so we can use gffloader.names->gseqs.
+
 }
 
 bool validateGffRec(GffObj* gffrec, GList<GffObj>* gfnew) {
@@ -758,6 +767,8 @@ void printGffObj(FILE* f, GffObj* gfo, GStr& locname, GffPrintMode exonPrinting,
     //if (t.exons.Count()==0 && t.children.Count()==0 && forceExons)
     //  t.addExonSegment(t.start,t.end);
     t.udata|=4;
+    if (!fmtGFF3 && !gfo->isTranscript())
+    	return; //only GFF3 prints non-transcript records (incl. parent genes)
     t.addAttr("locus", locname.chars());
     out_counter++;
     if (fmtGFF3) {
@@ -803,8 +814,13 @@ int main(int argc, char* argv[]) {
  fmtGTF=(args.getOpt('T')!=NULL); //switch output format to GTF
  fmtBED=(args.getOpt("bed")!=NULL);
  fmtTLF=(args.getOpt("tlf")!=NULL);
- if (fmtGTF || fmtBED || fmtTLF)
+ if (fmtGTF || fmtBED || fmtTLF) {
+	 if (!gffloader.transcriptsOnly) {
+		 GMessage("Error: option -O is only supported with GFF3 output");
+		 exit(1);
+	 }
 	 fmtGFF3=false;
+ }
  BEDinput=(args.getOpt("in-bed")!=NULL);
  TLFinput=(args.getOpt("in-tlf")!=NULL);
  bothStrands=(args.getOpt('B')!=NULL);
@@ -982,8 +998,7 @@ int main(int argc, char* argv[]) {
 	   gffloader.TLFinput=true;
    gffloader.openFile(infile); //TODO: accept multiple files?
 
-   gffloader.load(g_data, &validateGffRec); // , doCluster, doCollapseRedundant,
-                             // matchAllIntrons, fuzzSpan, forceExons);
+   gffloader.load(g_data, &validateGffRec, &processGffComment);
 
    if (gffloader.doCluster)
      collectLocusData(g_data, covInfo);
@@ -1051,7 +1066,7 @@ int main(int argc, char* argv[]) {
              //t.udata|=4; //tag it as valid
              numvalid++;
              if (idxfirstvalid<0) idxfirstvalid=i;
-             }
+         }
        } //for each transcript
 
        int rnas_i=0;
@@ -1072,8 +1087,8 @@ int main(int argc, char* argv[]) {
 						   loc.print(f_out, idxfirstvalid, locname, loctrack);
 						   firstLocusPrint=false;
 					   }
+					   printGffObj(f_out, loc.gfs[gfs_i], locname, exonPrinting, out_counter);
 				   }
-				   printGffObj(f_out, loc.gfs[gfs_i], locname, exonPrinting, out_counter);
 				   ++gfs_i;
 				   continue;
 			   }
@@ -1103,7 +1118,8 @@ int main(int argc, char* argv[]) {
      int gfs_i=0;
      for (int m=0;m<gdata->rnas.Count();m++) {
         GffObj& t=*(gdata->rnas[m]);
-        if (f_out) {
+        if (f_out && fmtGFF3) {
+         //print other non-transcript (gene?) feature that might be there before t
          while (gfs_i<gdata->gfs.Count() && gdata->gfs[gfs_i]->start<=t.start) {
             GffObj& gfst=*(gdata->gfs[gfs_i]);
             if ((gfst.udata&4)==0) { //never printed
@@ -1119,25 +1135,28 @@ int main(int argc, char* argv[]) {
         if (process_transcript(gfasta, t)) {
            numvalid++;
            if (f_out && (t.udata & 4) ==0 ) {
-             if (tdata->geneinfo) tdata->geneinfo->finalize();
-             out_counter++;
              t.udata |=4;
-             // if (fmtGTF) t.printGxf(f_out, exonPrinting, tracklabel, NULL, decodeChars);
-             if (firstGff3Print) { printGff3Header(f_out, args);firstGff3Print=false; }
-             //print the parent first, if any
-             if (t.parent!=NULL && ((t.parent->udata & 4)==0)) {
-                 GTData* pdata=(GTData*)(t.parent->uptr);
-                 if (pdata && pdata->geneinfo!=NULL)
-                      pdata->geneinfo->finalize();
-                 t.parent->printGxf(f_out, exonPrinting, tracklabel, NULL, decodeChars);
-                 t.parent->udata|=4;
+             if (fmtGFF3 || t.isTranscript()) {
+				 if (tdata->geneinfo)
+					 tdata->geneinfo->finalize();
+				 out_counter++;
+				 // if (fmtGTF) t.printGxf(f_out, exonPrinting, tracklabel, NULL, decodeChars);
+				 if (firstGff3Print) { printGff3Header(f_out, args);firstGff3Print=false; }
+				 //for GFF3, print the parent first, if any
+				 if (fmtGFF3 && t.parent!=NULL && ((t.parent->udata & 4)==0)) {
+					 GTData* pdata=(GTData*)(t.parent->uptr);
+					 if (pdata && pdata->geneinfo!=NULL)
+						  pdata->geneinfo->finalize();
+					 t.parent->printGxf(f_out, exonPrinting, tracklabel, NULL, decodeChars);
+					 t.parent->udata|=4;
+				 }
+				 t.printGxf(f_out, exonPrinting, tracklabel, NULL, decodeChars);
              }
-             t.printGxf(f_out, exonPrinting, tracklabel, NULL, decodeChars);
            }//GFF/GTF output requested
         } //valid transcript
      } //for each rna
      //print the rest of the isolated pseudo/gene/region features not printed yet
-     if (f_out) {
+     if (f_out && fmtGFF3) {
       while (gfs_i<gdata->gfs.Count()) {
          GffObj& gfst=*(gdata->gfs[gfs_i]);
          if ((gfst.udata&4)==0) { //never printed
