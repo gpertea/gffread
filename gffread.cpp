@@ -116,17 +116,13 @@ class SeqInfo { //populated from the -s option of gffread
  public:
   int len;
   char* descr;
-  SeqInfo( int l, char* s) {
-   len=l;
-   if (s==NULL) {
-     descr=NULL;
-     }   else {
-     descr=Gstrdup(s);
-     }
-   }
+  SeqInfo( int l, char* s): len(l), descr(NULL) {
+    if (s!=NULL)
+      descr=Gstrdup(s);
+  }
   ~SeqInfo() {
-   GFREE(descr);
-   }
+    GFREE(descr);
+  }
 };
 
 class RefTran {
@@ -688,6 +684,16 @@ void printGff3Header(FILE* f, GArgs& args) {
   fprintf(f, "##gff-version 3\n");
 }
 
+
+void processGffComment(const char* cmline) {
+ const char* p=cmline;
+ while (*p=='#') p++;
+ GStr s(p);
+ //TODO: this must be called after gffloader initialization
+ // so we can use gffloader.names->gseqs.
+
+}
+
 bool validateGffRec(GffObj* gffrec, GList<GffObj>* gfnew) {
 	if (reftbl.Count()>0) { //check if we need to reject by ref seq filter
 		GStr refname(gffrec->getRefName());
@@ -992,8 +998,7 @@ int main(int argc, char* argv[]) {
 	   gffloader.TLFinput=true;
    gffloader.openFile(infile); //TODO: accept multiple files?
 
-   gffloader.load(g_data, &validateGffRec); // , doCluster, doCollapseRedundant,
-                             // matchAllIntrons, fuzzSpan, forceExons);
+   gffloader.load(g_data, &validateGffRec, &processGffComment);
 
    if (gffloader.doCluster)
      collectLocusData(g_data, covInfo);

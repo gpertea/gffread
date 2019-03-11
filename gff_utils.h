@@ -435,6 +435,8 @@ class GenomicSeqData {
   int gseq_id;
  public:
   const char* gseq_name;
+  int seqreg_start; //if given by ##sequence-region comment
+  int seqreg_end;
   GList<GffObj> gfs; //all non-transcript features -> usually gene features
   GList<GffObj> rnas; //all transcripts on this genomic sequence
   GList<GffLocus> loci; //all loci clusters
@@ -443,13 +445,13 @@ class GenomicSeqData {
   uint64 r_bases;//base coverage on reverse strand
   uint64 u_bases;//base coverage on undetermined strand
   //GenomicSeqData(int gid=-1):rnas(true,true,false),loci(true,true,true),
-  GenomicSeqData(int gid=-1):gfs(true, true, false),rnas((GCompareProc*)gfo_cmpByLoc),loci(true,true,false),
-       tdata(false,true,false),  f_bases(0), r_bases(0), u_bases(0) {
-  gseq_id=gid;
+  GenomicSeqData(int gid=-1):gseq_id(gid), gseq_name(NULL), seqreg_start(0), seqreg_end(0),
+		  gfs(true, true, false),rnas((GCompareProc*)gfo_cmpByLoc),loci(true,true,false),
+		  tdata(false,true,false),  f_bases(0), r_bases(0), u_bases(0) {
   if (gseq_id>=0)
     gseq_name=GffObj::names->gseqs.getName(gseq_id);
-
   }
+
   bool operator==(GenomicSeqData& d){
     return gseq_id==d.gseq_id;
   }
@@ -524,6 +526,7 @@ class GSpliceSite {
 
 class GffLoader {
  public:
+  GVec<char*> headerLines; //for GFF3 we keep the first few header lines (not the sequence-region one)
   GStr fname;
   FILE* f;
   GffNames* names;
@@ -570,7 +573,7 @@ class GffLoader {
       }
   }
 
-  void load(GList<GenomicSeqData>&seqdata, GFValidateFunc* gf_validate=NULL);
+  void load(GList<GenomicSeqData>&seqdata, GFValidateFunc* gf_validate=NULL, GFFCommentParser* gf_parsecomment=NULL);
 
   bool placeGf(GffObj* t, GenomicSeqData* gdata);
 
@@ -579,14 +582,21 @@ class GffLoader {
 	if (f!=stdin) fclose(f);
 	f=NULL;
   }
-
   void terminate() {
 	  if (f!=NULL) closeFile();
 	  	  gffnames_unref(names);
   }
-
+  void clearHeaderLines() {
+	  if (headerLines.Count()>0) {
+		  for (int i=0;i<headerLines.Count();i++) {
+			  GFREE(headerLines[i]);
+			  headerLines[i]=NULL;
+		  }
+	  }
+  }
   ~GffLoader() {
 	  this->terminate();
+	  clearHeaderLines();
   }
 
 };
