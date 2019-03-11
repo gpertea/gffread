@@ -675,11 +675,13 @@ void GffLoader::load(GList<GenomicSeqData>& seqdata, GFValidateFunc* gf_validate
 	GffReader* gffr=new GffReader(f, this->transcriptsOnly, true); //not only mRNA features, sorted
 	gffr->showWarnings(verbose);
 	//           keepAttrs   mergeCloseExons  noExonAttr
-	gffr->set_gene2exon(gene2exon);
+	gffr->gene2Exon(gene2exon);
 	if (BEDinput) gffr->isBED(true);
 	//if (TLFinput) gffr->isTLF(true);
-	gffr->mergingCloseExons(mergeCloseExons);
-	gffr->keepingAttrs(fullAttributes, gatherExonAttrs);
+	gffr->mergeCloseExons(mergeCloseExons);
+	gffr->keepAttrs(fullAttributes, gatherExonAttrs);
+	gffr->keepGenes(keepGenes);
+	gffr->setRefAlphaSorted(this->sortRefsAlpha);
 	gffr->readAll();
 	GVec<int> pseudoFeatureIds; //feature type: pseudo*
 	GVec<int> pseudoAttrIds;  // attribute: [is]pseudo*=true/yes/1
