@@ -19,6 +19,7 @@ gffread <input_gff> [-g <genomic_seqs_fasta> | <dir>][-s <seq_info.fsize>] \n\
  \n\
 Options:\n\
  -i   discard transcripts having an intron larger than <maxintron>\n\
+ -l   discard transcripts shorter than <minlen> bases\n\
  -r   only show transcripts overlapping coordinate range <start>..<end>\n\
       (on chromosome/contig <chr>, strand <strand> if provided)\n\
  -R   for -r option, discard all transcripts that are not fully \n\
@@ -148,7 +149,7 @@ FILE* f_y=NULL; //fasta with translated CDS
 
 bool wCDSonly=false;
 bool wNConly=false;
-
+int minLen=0; //minimum transcript length
 bool validCDSonly=false; // translation with no in-frame STOP
 bool bothStrands=false; //for single-exon mRNA validation, check the other strand too
 bool altPhases=false; //if original phase fails translation validation,
@@ -747,7 +748,8 @@ bool validateGffRec(GffObj* gffrec, GList<GffObj>* gfnew) {
 		//GMessage("Warning: discarding %s GFF generic gene/locus container %s\n",gffrec->getID());
 		return false;
 	}
-
+	if (minLen>0 && gffrec->covlen<minLen)
+    	return false;
 	if (rfltGSeq!=NULL) { //filter by gseqName
 		if (strcmp(gffrec->getGSeqName(),rfltGSeq)!=0) {
 			return false;
@@ -822,7 +824,7 @@ void printGffObj(FILE* f, GffObj* gfo, GStr& locname, GffPrintMode exonPrinting,
 int main(int argc, char* argv[]) {
  GArgs args(argc, argv,
    "version;debug;merge;adj-stop;bed;in-bed;tlf;in-tlf;cluster-only;nc;cov-info;help;"
-    "sort-alpha;keep-genes;keep-comments;force-exons;gene2exon;no-pseudo;sort-by=MINCOV=MINPID=hvOUNHPWCVJMKQTDARSZFGLEBm:g:i:r:s:t:o:w:x:y:d:");
+    "sort-alpha;keep-genes;keep-comments;force-exons;gene2exon;no-pseudo;sort-by=hvOUNHPWCVJMKQTDARSZFGLEBm:g:i:r:s:l:t:o:w:x:y:d:");
  args.printError(USAGE, true);
  if (args.getOpt('h') || args.getOpt("help")) {
     GMessage("%s",USAGE);
@@ -854,6 +856,7 @@ int main(int argc, char* argv[]) {
 	 }
 	 fmtGFF3=false;
  }
+
  BEDinput=(args.getOpt("in-bed")!=NULL);
  TLFinput=(args.getOpt("in-tlf")!=NULL);
  bothStrands=(args.getOpt('B')!=NULL);
@@ -933,16 +936,18 @@ int main(int argc, char* argv[]) {
  //    sortByLoc=true; //enforce sorting by chromosome/contig
  GStr s=args.getOpt('i');
  if (!s.is_empty()) maxintron=s.asInt();
+ s=args.getOpt('l');
+ if (!s.is_empty()) minLen=s.asInt();
 
  FILE* f_repl=NULL;
  s=args.getOpt('d');
  if (!s.is_empty()) {
    if (s=="-") f_repl=stdout;
-     else {
+   else {
        f_repl=fopen(s.chars(), "w");
        if (f_repl==NULL) GError("Error creating file %s\n", s.chars());
-       }
    }
+ }
 
  rfltWithin=(args.getOpt('R')!=NULL);
  s=args.getOpt('r');
