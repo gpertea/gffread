@@ -682,6 +682,10 @@ GenomicSeqData* getGSeqData(GList<GenomicSeqData>& seqdata, int gseq_id) {
 	return gdata;
 }
 
+void warnPseudo(GffObj& m) {
+	GMessage("Info: pseudo gene/transcript record with ID=%s discarded.\n",m.getID());
+}
+
 void GffLoader::load(GList<GenomicSeqData>& seqdata, GFValidateFunc* gf_validate, GFFCommentParser* gf_parsecomment) {
 	if (f==NULL) GError("Error: GffLoader::load() cannot be called before ::openFile()!\n");
 	GffReader* gffr=new GffReader(f, this->transcriptsOnly, true); //not only mRNA features, sorted
@@ -742,7 +746,10 @@ void GffLoader::load(GList<GenomicSeqData>& seqdata, GFValidateFunc* gf_validate
 					break;
 				}
 			}
-			if (is_pseudo) continue;
+			if (is_pseudo) {
+				if (verbose) warnPseudo(*m);
+				continue;
+			}
 			for (int i=0;i<pseudoAttrIds.Count();++i) {
 				char* attrv=NULL;
 				if (m->attrs!=NULL) attrv=m->attrs->getAttr(pseudoAttrIds[i]);
@@ -754,8 +761,11 @@ void GffLoader::load(GList<GenomicSeqData>& seqdata, GFValidateFunc* gf_validate
 					}
 				}
 			}
-			if (is_pseudo) continue;
-			//FIXME: *_type=*_pseudogene
+			if (is_pseudo) {
+				if (verbose) warnPseudo(*m);
+				continue;
+			}
+			//  *_type=*_pseudogene
             //find all attributes ending with _type and have value like: *_pseudogene
 			for (int i=0;i<pseudoTypeAttrIds.Count();++i) {
 				char* attrv=NULL;
@@ -766,7 +776,10 @@ void GffLoader::load(GList<GenomicSeqData>& seqdata, GFValidateFunc* gf_validate
 					break;
 				}
 			}
-			if (is_pseudo) continue;
+			if (is_pseudo) {
+				if (verbose) warnPseudo(*m);
+				continue;
+			}
 		} //pseudogene detection requested
 		char* rloc=m->getAttr("locus");
 		if (rloc!=NULL && startsWith(rloc, "RLOC_")) {
