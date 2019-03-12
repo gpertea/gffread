@@ -755,8 +755,8 @@ bool validateGffRec(GffObj* gffrec, GList<GffObj>* gfnew) {
 	}
 	if (minLen>0 && gffrec->covlen<minLen) {
 		if (verbose)
-			GMessage("Info: %s discarded due to minimum length limit\n",
-					gffrec->getID());
+			GMessage("Info: %s discarded due to minimum length threshold %d\n",
+					gffrec->getID(), minLen);
     	return false;
 	}
 	if (rfltGSeq!=NULL) { //filter by gseqName
