@@ -741,15 +741,24 @@ bool validateGffRec(GffObj* gffrec, GList<GffObj>* gfnew) {
 		if (rt) {
 			gffrec->setRefName(rt->new_name);
 		}
-		else return false; //discard, ref seq not in the given translation table
+		else {
+			if (verbose)
+				GMessage("Info: %s discarded due to reference %s not being mapped\n",
+						gffrec->getID(), refname.chars());
+			return false; //discard, ref seq not in the given translation table
+		}
 	}
 	if (gffloader.transcriptsOnly && gffrec->isDiscarded()) {
 		//discard generic "locus" features with no other detailed subfeatures
 		//GMessage("Warning: discarding %s GFF generic gene/locus container %s\n",gffrec->getID());
 		return false;
 	}
-	if (minLen>0 && gffrec->covlen<minLen)
+	if (minLen>0 && gffrec->covlen<minLen) {
+		if (verbose)
+			GMessage("Info: %s discarded due to minimum length limit\n",
+					gffrec->getID());
     	return false;
+	}
 	if (rfltGSeq!=NULL) { //filter by gseqName
 		if (strcmp(gffrec->getGSeqName(),rfltGSeq)!=0) {
 			return false;
