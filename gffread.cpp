@@ -1107,12 +1107,16 @@ int main(int argc, char* argv[]) {
                   fprintf(f_repl," => %s", rby->replaced_by->getID());
                   rby->rna->udata|=8;
                   rby=(GTData*)(rby->replaced_by->uptr);
-                  }
-               fprintf(f_repl, "\n");
                }
-            t.udata|=4; //not going to print this
-            continue;
+               fprintf(f_repl, "\n");
             }
+            t.udata|=4; //not going to print this
+            if (verbose) {
+            	GMessage("Info: %s discarded due to being superseded (replaced) by %s\n",
+            			t.getID(), tdata->replaced_by->getID());
+            }
+            continue;
+         }
          if (process_transcript(gfasta, t)) {
              //t.udata|=4; //tag it as valid
              numvalid++;
