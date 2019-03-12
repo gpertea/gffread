@@ -462,6 +462,8 @@ class GenomicSeqData {
 
 int gseqCmpName(const pointer p1, const pointer p2);
 
+GenomicSeqData* getGSeqData(GList<GenomicSeqData>& seqdata, int gseq_id);
+
 class GSpliceSite {
  public:
   char nt[3];
@@ -542,6 +544,7 @@ class GffLoader {
 		bool BEDinput:1;
 		bool TLFinput:1;
 		bool keepGenes:1;
+		bool keepGff3Comments:1;
 		bool sortRefsAlpha:1;
 		bool doCluster:1;
 		bool collapseRedundant:1;
@@ -553,14 +556,14 @@ class GffLoader {
 
   GffLoader():fname(),f(NULL), names(NULL), options(0) {
       transcriptsOnly=true;
-      names=GffObj::names; //GFF dictionaries
-      gffnames_ref(names);
+      gffnames_ref(GffObj::names);
+      names=GffObj::names;
   }
 
   void loadRefNames(GStr& flst);
 
   void openFile(GStr& file_name) {
-	  if (f!=NULL) closeFile();
+	  //if (f!=NULL) closeFile();
 	  fname=file_name;
       if (fname=="-" || fname=="stdin") {
          f=stdin;
@@ -577,14 +580,10 @@ class GffLoader {
 
   bool placeGf(GffObj* t, GenomicSeqData* gdata);
 
-  void closeFile() {
-	fname="";
-	if (f!=stdin) fclose(f);
-	f=NULL;
-  }
   void terminate() {
-	  if (f!=NULL) closeFile();
-	  	  gffnames_unref(names);
+	  //if (f!=NULL) closeFile(); GffReader is going to close the file
+	  gffnames_unref(GffObj::names);
+	  names=NULL;
   }
   void clearHeaderLines() {
 	  if (headerLines.Count()>0) {

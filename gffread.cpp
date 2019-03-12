@@ -41,6 +41,7 @@ Misc options: \n\
  -G   do not keep exon attributes, move them to the transcript feature\n\
       (for GFF3 output)\n\
  --keep-genes : in transcript-only mode (default), also preserve gene records\n\
+ --keep-comments: for GFF3 input/output, try to preserve comments\n\
  -O   process other non-transcript GFF records (by default non-transcript\n\
       records are ignored)\n\
  -V   discard any mRNAs with CDS having in-frame stop codons (requires -g)\n\
@@ -678,20 +679,52 @@ void openfw(FILE* &f, GArgs& args, char opt) {
 #define FWCLOSE(fh) if (fh!=NULL && fh!=stdout) fclose(fh)
 
 void printGff3Header(FILE* f, GArgs& args) {
-  fprintf(f, "# ");
-  args.printCmdLine(f);
-  fprintf(f, "# gffread v" VERSION "\n");
-  fprintf(f, "##gff-version 3\n");
+  if (gffloader.keepGff3Comments) {
+	for (int i=0;i<gffloader.headerLines.Count();i++) {
+		fprintf(f, "%s\n", gffloader.headerLines[i]);
+	}
+  } else {
+    fprintf(f, "# ");
+    args.printCmdLine(f);
+    fprintf(f, "# gffread v" VERSION "\n");
+    fprintf(f, "##gff-version 3\n");
+  }
 }
 
+void printGSeqHeader(FILE* f, GenomicSeqData* gdata) {
+if (f && gffloader.keepGff3Comments && gdata->seqreg_start>0 && gdata->seqreg_end>0)
+	 fprintf(f, "##sequence-region %s %d %d\n", gdata->gseq_name,
+			 gdata->seqreg_start, gdata->seqreg_end);
 
-void processGffComment(const char* cmline) {
+}
+
+void processGffComment(const char* cmline, GfList* gflst) {
+ if (cmline[0]!='#') return;
  const char* p=cmline;
  while (*p=='#') p++;
  GStr s(p);
- //TODO: this must be called after gffloader initialization
- // so we can use gffloader.names->gseqs.
-
+ //this can be called only after gffloader initialization
+ // so we can use gffloader.names->gseqs.addName()
+ s.startTokenize("\t ", tkCharSet);
+ GStr w;
+  if (s.nextToken(w) && w=="sequence-region") {
+	 GStr chr, wend;
+	 if (s.nextToken(chr) && s.nextToken(w) && s.nextToken(wend)) {
+		 int gseq_id=gffloader.names->gseqs.addName(chr.chars());
+		 if (gseq_id>=0) {
+			 GenomicSeqData* gseqdata=getGSeqData(g_data, gseq_id);
+			 gseqdata->seqreg_start=w.asInt();
+			 gseqdata->seqreg_end=wend.asInt();
+		 }
+		 else GError("Error adding ref seq ID %s\n", chr.chars());
+	 }
+	 return;
+ }
+ if (gflst->Count()==0) {
+    //initial Gff3 header, store it
+	char* hl=Gstrdup(cmline);
+    gffloader.headerLines.Add(hl);
+ }
 }
 
 bool validateGffRec(GffObj* gffrec, GList<GffObj>* gfnew) {
@@ -789,7 +822,7 @@ void printGffObj(FILE* f, GffObj* gfo, GStr& locname, GffPrintMode exonPrinting,
 int main(int argc, char* argv[]) {
  GArgs args(argc, argv,
    "version;debug;merge;adj-stop;bed;in-bed;tlf;in-tlf;cluster-only;nc;cov-info;help;"
-    "sort-alpha;keep-genes;force-exons;gene2exon;no-pseudo;sort-by=MINCOV=MINPID=hvOUNHPWCVJMKQTDARSZFGLEBm:g:i:r:s:t:o:w:x:y:d:");
+    "sort-alpha;keep-genes;keep-comments;force-exons;gene2exon;no-pseudo;sort-by=MINCOV=MINPID=hvOUNHPWCVJMKQTDARSZFGLEBm:g:i:r:s:t:o:w:x:y:d:");
  args.printError(USAGE, true);
  if (args.getOpt('h') || args.getOpt("help")) {
     GMessage("%s",USAGE);
@@ -829,6 +862,7 @@ int main(int argc, char* argv[]) {
  StarStop=(args.getOpt('S')!=NULL);
 
  gffloader.keepGenes=(args.getOpt("keep-genes")!=NULL);
+ gffloader.keepGff3Comments=(args.getOpt("keep-comments")!=NULL);
  gffloader.sortRefsAlpha=(args.getOpt("sort-alpha")!=NULL);
  if (args.getOpt("sort-by")!=NULL) {
 	  if (gffloader.sortRefsAlpha)
@@ -981,30 +1015,29 @@ int main(int argc, char* argv[]) {
  while (true) {
    GStr infile;
    if (numfiles) {
-          infile=args.nextNonOpt();
-          if (infile.is_empty()) break;
-          if (infile=="-") { f_in=stdin; infile="stdin"; }
-               else
-                 if ((f_in=fopen(infile, "r"))==NULL)
+      infile=args.nextNonOpt();
+      if (infile.is_empty()) break;
+      if (infile=="-") { f_in=stdin; infile="stdin"; }
+           else  if ((f_in=fopen(infile, "r"))==NULL)
                     GError("Error: cannot open input file %s!\n",infile.chars());
                  else fclose(f_in);
-          }
-        else infile="-";
+      numfiles--;
+   }
+   else infile="-";
 
    const char* fext=getFileExt(infile.chars());
    if (BEDinput || (Gstricmp(fext, "bed")==0))
 	   gffloader.BEDinput=true;
    if (TLFinput || (Gstricmp(fext, "tlf")==0))
 	   gffloader.TLFinput=true;
-   gffloader.openFile(infile); //TODO: accept multiple files?
+   gffloader.openFile(infile);
 
    gffloader.load(g_data, &validateGffRec, &processGffComment);
 
    if (gffloader.doCluster)
      collectLocusData(g_data, covInfo);
    if (numfiles==0) break;
-   gffloader.closeFile();
-   }
+ }
  if (covInfo) {
 	 //report coverage info at STDOUT
 	 uint64 f_bases=0;
@@ -1038,6 +1071,10 @@ int main(int argc, char* argv[]) {
    //grouped in loci
    for (int g=0;g<g_data.Count();g++) {
      GenomicSeqData* gdata=g_data[g];
+     bool firstGSeqHeader=fmtGFF3;
+     if (f_out && fmtGFF3 && gffloader.keepGff3Comments && gdata->seqreg_start>0)
+    	 fprintf(f_out, "##sequence-region %s %d %d\n", gdata->gseq_name,
+    			 gdata->seqreg_start, gdata->seqreg_end);
      for (int l=0;l<gdata->loci.Count();l++) {
        bool firstLocusPrint=true;
        GffLocus& loc=*(gdata->loci[l]);
@@ -1083,6 +1120,7 @@ int main(int argc, char* argv[]) {
 				   //print the gene object first
 				   if (fmtGFF3) { //BED, TLF and GTF: only show transcripts
 					   if (firstGff3Print) { printGff3Header(f_out, args);firstGff3Print=false; }
+					   if (firstGSeqHeader) { printGSeqHeader(f_out, gdata); firstGSeqHeader=false; }
 					   if (firstLocusPrint) {
 						   loc.print(f_out, idxfirstvalid, locname, loctrack);
 						   firstLocusPrint=false;
@@ -1096,6 +1134,7 @@ int main(int argc, char* argv[]) {
 				       //loc.rnas[rnas_i]->printGxf(f_out, exonPrinting, tracklabel, NULL, decodeChars);
 				       if (fmtGFF3) {
 					     if (firstGff3Print) { printGff3Header(f_out, args); firstGff3Print=false; }
+					     if (firstGSeqHeader) { printGSeqHeader(f_out, gdata); firstGSeqHeader=false; }
 					     if (firstLocusPrint) {
 					    	 loc.print(f_out, idxfirstvalid, locname, loctrack);
 					    	 firstLocusPrint=false;
@@ -1115,6 +1154,7 @@ int main(int argc, char* argv[]) {
    int numvalid=0;
    for (int g=0;g<g_data.Count();g++) {
      GenomicSeqData* gdata=g_data[g];
+     bool firstGSeqHeader=fmtGFF3;
      int gfs_i=0;
      for (int m=0;m<gdata->rnas.Count();m++) {
         GffObj& t=*(gdata->rnas[m]);
@@ -1125,6 +1165,7 @@ int main(int argc, char* argv[]) {
             if ((gfst.udata&4)==0) { //never printed
               gfst.udata|=4;
               if (firstGff3Print) { printGff3Header(f_out, args);firstGff3Print=false; }
+              if (firstGSeqHeader) { printGSeqHeader(f_out, gdata); firstGSeqHeader=false; }
               gfst.printGxf(f_out, exonPrinting, tracklabel, NULL, decodeChars);
             }
             ++gfs_i;
@@ -1142,6 +1183,7 @@ int main(int argc, char* argv[]) {
 				 out_counter++;
 				 // if (fmtGTF) t.printGxf(f_out, exonPrinting, tracklabel, NULL, decodeChars);
 				 if (firstGff3Print) { printGff3Header(f_out, args);firstGff3Print=false; }
+				 if (firstGSeqHeader) { printGSeqHeader(f_out, gdata); firstGSeqHeader=false; }
 				 //for GFF3, print the parent first, if any
 				 if (fmtGFF3 && t.parent!=NULL && ((t.parent->udata & 4)==0)) {
 					 GTData* pdata=(GTData*)(t.parent->uptr);
@@ -1161,7 +1203,8 @@ int main(int argc, char* argv[]) {
          GffObj& gfst=*(gdata->gfs[gfs_i]);
          if ((gfst.udata&4)==0) { //never printed
            gfst.udata|=4;
-           if (firstGff3Print) { printGff3Header(f_out, args);firstGff3Print=false; }
+           if (firstGff3Print) { printGff3Header(f_out, args); firstGff3Print=false; }
+           if (firstGSeqHeader) { printGSeqHeader(f_out, gdata); firstGSeqHeader=false; }
            gfst.printGxf(f_out, exonPrinting, tracklabel, NULL, decodeChars);
            }
          ++gfs_i;

@@ -670,6 +670,18 @@ void GffLoader::loadRefNames(GStr& flst) {
 	}
 }
 
+GenomicSeqData* getGSeqData(GList<GenomicSeqData>& seqdata, int gseq_id) {
+	int i=-1;
+	GenomicSeqData f(gseq_id);
+	GenomicSeqData* gdata=NULL;
+	if (seqdata.Found(&f,i)) gdata=seqdata[i];
+	else { //entry not created yet for this genomic seq
+		gdata=new GenomicSeqData(gseq_id);
+		seqdata.Add(gdata);
+	}
+	return gdata;
+}
+
 void GffLoader::load(GList<GenomicSeqData>& seqdata, GFValidateFunc* gf_validate, GFFCommentParser* gf_parsecomment) {
 	if (f==NULL) GError("Error: GffLoader::load() cannot be called before ::openFile()!\n");
 	GffReader* gffr=new GffReader(f, this->transcriptsOnly, true); //not only mRNA features, sorted
@@ -683,7 +695,7 @@ void GffLoader::load(GList<GenomicSeqData>& seqdata, GFValidateFunc* gf_validate
 	gffr->keepAttrs(fullAttributes, gatherExonAttrs);
 	gffr->keepGenes(keepGenes);
 	gffr->setRefAlphaSorted(this->sortRefsAlpha);
-	if (gf_parsecomment!=NULL) gffr->setCommentParser(gf_parsecomment);
+	if (keepGff3Comments && gf_parsecomment!=NULL) gffr->setCommentParser(gf_parsecomment);
 	gffr->readAll();
 	GVec<int> pseudoFeatureIds; //feature type: pseudo*
 	GVec<int> pseudoAttrIds;  // attribute: [is]pseudo*=true/yes/1
@@ -768,14 +780,7 @@ void GffLoader::load(GList<GenomicSeqData>& seqdata, GFValidateFunc* gf_validate
 			continue;
 		}
 		m->isUsed(true); //so the gffreader won't destroy it
-		int i=-1;
-		GenomicSeqData f(m->gseq_id);
-		GenomicSeqData* gdata=NULL;
-		if (seqdata.Found(&f,i)) gdata=seqdata[i];
-		else { //entry not created yet for this genomic seq
-			gdata=new GenomicSeqData(m->gseq_id);
-			seqdata.Add(gdata);
-		}
+		GenomicSeqData* gdata=getGSeqData(seqdata, m->gseq_id);
 		bool keep=placeGf(m, gdata);
 		if (!keep) {
 			m->isUsed(false);
