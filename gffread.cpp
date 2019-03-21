@@ -4,7 +4,7 @@
 #define __STDC_FORMAT_MACROS
 #include <inttypes.h>
 
-#define VERSION "0.11.0"
+#define VERSION "0.11.1"
 
 #define USAGE "gffread v" VERSION ". Usage:\n\
 gffread <input_gff> [-g <genomic_seqs_fasta> | <dir>][-s <seq_info.fsize>] \n\
@@ -1069,7 +1069,8 @@ int main(int argc, char* argv[]) {
  }
  GStr loctrack("gffcl");
  if (tracklabel) loctrack=tracklabel;
- g_data.setSorted(&gseqCmpName);
+ if (gffloader.sortRefsAlpha)
+    g_data.setSorted(&gseqCmpName);
  GffPrintMode exonPrinting;
  if (fmtGTF)
 	 exonPrinting = pgtfAny;
