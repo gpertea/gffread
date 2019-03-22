@@ -53,6 +53,8 @@ Misc options: \n\
       opposite strand (requires -g)\n\
  -P   add transcript level GFF attributes about the coding status of each\n\
       transcript, including partialness or in-frame stop codons (requires -g)\n\
+ --add-hasCDS : add a \"hasCDS\" attribute with value \"true\" for transcripts\n\
+      that have CDS features\n\
  --adj-stop stop codon adjustment: enables -P and performs automatic\n\
       adjustment of the CDS stop coordinate if premature or downstream\n\
  -N   discard multi-exon mRNAs that have any intron with a non-canonical\n\
@@ -155,6 +157,7 @@ bool bothStrands=false; //for single-exon mRNA validation, check the other stran
 bool altPhases=false; //if original phase fails translation validation,
                      //try the other 2 phases until one makes it
 bool addCDSattrs=false;
+bool add_hasCDS=false;
 bool adjustStop=false; //automatic adjust the CDS stop coordinate
 bool covInfo=false; // --cov-info : only report genome coverage
 //bool transcriptsOnly=true;
@@ -445,7 +448,7 @@ bool process_transcript(GFastaDb& gfasta, GffObj& gffrec) {
   bool fullCDS=false;
   bool endStop=false;
   bool stopAdjusted=false;
-  if (addCDSattrs && gffrec.hasCDS()) gffrec.addAttr("hasCDS", "true");
+  if (add_hasCDS && gffrec.hasCDS()) gffrec.addAttr("hasCDS", "true");
   if (gffrec.CDphase=='1' || gffrec.CDphase=='2')
       mCDphase = gffrec.CDphase-'0';
   //CDS partialness only added when -y -x -V options are given
@@ -510,7 +513,7 @@ bool process_transcript(GFastaDb& gfasta, GffObj& gffrec) {
                  goto CDS_CHECK; //repeat the CDS check for a different frame
               }
            }
-           if (verbose) GMessage("In-frame STOP found for '%s'\n",gffrec.getID());
+           if (verbose) GMessage("Warning: In-frame STOP found for '%s'\n",gffrec.getID());
            if (addCDSattrs) gffrec.addAttr("InFrameStop", "true");
          } //has in-frame STOP
          if (stopAdjusted) {
@@ -851,6 +854,7 @@ int main(int argc, char* argv[]) {
  wCDSonly=(args.getOpt('C')!=NULL);
  wNConly=(args.getOpt("nc")!=NULL);
  addCDSattrs=(args.getOpt('P')!=NULL);
+ add_hasCDS=(args.getOpt("add-hasCDS")!=NULL);
  adjustStop=(args.getOpt("adj-stop")!=NULL);
  if (adjustStop) addCDSattrs=true;
  validCDSonly=(args.getOpt('V')!=NULL);
