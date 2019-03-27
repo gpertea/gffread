@@ -1056,7 +1056,6 @@ int main(int argc, char* argv[]) {
    if (TLFinput || (Gstricmp(fext, "tlf")==0))
 	   gffloader.TLFinput=true;
    gffloader.openFile(infile);
-
    gffloader.load(g_data, &validateGffRec, &processGffComment);
    // will also place the transcripts in loci, if doCluster is enabled
    if (gffloader.doCluster)

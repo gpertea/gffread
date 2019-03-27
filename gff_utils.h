@@ -114,22 +114,22 @@ class GffLocus;
 
 class GTData { //transcript associated data
  public:
-    GffObj* rna;
-    GffLocus* locus;
-    GffObj* replaced_by;
-    GeneInfo* geneinfo;
-    //int flag;
-    GTData(GffObj* t=NULL) {
-        rna=t;
-        //flag=0;
-        locus=NULL;
-        replaced_by=NULL;
-        geneinfo=NULL;
-        if (rna!=NULL) {
-            geneinfo=(GeneInfo*)rna->uptr; //take over geneinfo, if there
-            rna->uptr=this;
-            }
-        }
+   GffObj* rna;
+   GffLocus* locus;
+   GffObj* replaced_by;
+   GeneInfo* geneinfo;
+   //int flag;
+   GTData(GffObj* t=NULL) {
+       rna=t;
+       //flag=0;
+       locus=NULL;
+       replaced_by=NULL;
+       geneinfo=NULL;
+       if (rna!=NULL) {
+           geneinfo=(GeneInfo*)rna->uptr; //take over geneinfo, if there
+           rna->uptr=this;
+       }
+   }
    bool operator<(GTData& b) { return (rna < b.rna); }
    bool operator==(GTData& b) { return (rna==b.rna); }
 };
@@ -264,10 +264,15 @@ public:
              }
         }
         if (idxfirstvalid>=0) {
-            fprintf(f, ";transcripts=%s",this->rnas[idxfirstvalid]->getID());
-            for (int i=idxfirstvalid+1;i<this->rnas.Count();i++) {
-              fprintf(f, ",%s",this->rnas[i]->getID());
-            }
+        	GVec<int> tidx; //set of printable (non-discarded) rnas indexes
+        	for (int i=idxfirstvalid;i<this->rnas.Count();i++)
+        		if (((GTData*)this->rnas[i]->uptr)->replaced_by==NULL)
+        			tidx.Add(i);
+        	if (tidx.Count()>0) {
+               fprintf(f, ";transcripts=%s",this->rnas[tidx[0]]->getID());
+               for (int i=1;i<tidx.Count();i++)
+                 fprintf(f, ",%s",this->rnas[tidx[i]]->getID());
+        	}
         }
         fprintf(f, "\n");
     }
@@ -327,14 +332,24 @@ public:
             t_maxcov=locus.t_maxcov;
     }
 
-    bool add_gfobj(GffObj* t) {
+    bool add_gfobj(GffObj* t, bool adj) {
         //if (rnas.Count()==0) return true; //? should never be called on an empty locus
-        if (t->gseq_id!=gseq_id || /* t->strand!=strand || */ t->start>end || start>t->end)
+    	uint t_start=t->start;
+    	uint t_end=t->end;
+    	if (adj) {
+    		t_start--;
+    		t_end++;
+    	}
+        if (t->gseq_id!=gseq_id || /* t->strand!=strand || */ t_start>end || start>t_end)
               return false; //rna must be on the same genomic seq
         //check for exon overlap with existing mexons
         //also update mexons accordingly if t is to be added
         bool hasovl=false;
-        if (t->exons.Count()>0) {
+        if (t->exons.Count()>0) { //transcript-like entity
+        	if (adj) {
+        		t->exons.First()->start--;
+        		t->exons.Last()->end++;
+        	}
 			int i=0; //index of first mexons with a merge
 			int j=0; //index current t exon
 			GArray<int> ovlexons(true,true); //list of mrna exon indexes overlapping mexons
@@ -365,6 +380,10 @@ public:
 
 				j++; //check the next t exon
 			}//all vs all exon check loop
+        	if (adj) {
+        		t->exons.First()->start++;
+        		t->exons.Last()->end--;
+        	}
 	        if (hasovl) {
 	            GSeg seg;
 	             //add the rest of the non-overlapping exons
@@ -372,12 +391,12 @@ public:
 	                seg.start=t->exons[i]->start;
 	                seg.end=t->exons[i]->end;
 	                if (!ovlexons.Exists(i)) mexons.Add(seg);
-	                }
+	            }
 	            t_add(t);
 	            // add to rnas
 	            ((GTData*)t->uptr)->locus=this;
 	            gseq_id=t->gseq_id;
-	        }
+	       }
         } else {
         	//gene overlap check
 			uint jstart=t->start;
@@ -420,13 +439,14 @@ public:
       // adjust start/end
       //if (start==0 || start>t->start) start=t->start;
       if (start==0) start=t->start;
-        else if (start>t->start) {
+      else if (start>t->start) {
           start=t->start;
-          }
+      }
       if (end<t->end) end=t->end;
       if (t_maxcov->covlen<t->covlen) t_maxcov=t;
       if (strand==0 || (strand=='.' && t->strand!='.')) strand=t->strand;
-      if (t->ftype_id==gff_fid_mRNA) is_mrna=true;
+      //if (t->ftype_id==gff_fid_mRNA) is_mrna=true;
+      if (t->isTranscript()) is_mrna=true;
     }
 };
 

@@ -165,26 +165,29 @@ bool GffLoader::unsplContained(GffObj& ti, GffObj&  tj) {
  //but it does not cross any intron-exon boundary of tj
   int imax=ti.exons.Count()-1;
   int jmax=tj.exons.Count()-1;
-  if (imax>0) GError("Error: bad unsplContained() call, 1st param must be single-exon transcript!\n");
+  if (imax>0) GError("Error: bad unsplContained() call, 1st parameter must be single-exon transcript!\n");
   if (fuzzSpan) {
-    int minovl = dOvlSET ? 5 : (int)(0.8 * ti.len()); //minimum overlap to declare "redundancy"
+    int maxIntronOvl=dOvlSET ? 25 : 0;
+    //int minovl = dOvlSET ? 5 : (int)(0.8 * ti.len()); //minimum overlap to declare "redundancy"
     for (int j=0;j<=jmax;j++) {
-       //must NOT overlap the introns
-       if ((j>0 && ti.start<tj.exons[j]->start)
-          || (j<jmax && ti.end>tj.exons[j]->end))
-         return false;
-       if (ti.exons[0]->overlapLen(tj.exons[j])>=minovl)
-         return true;
-    }
-  } else { // not fuzzSpan, strict containment
+       bool exonOverlap=false;
+       if (dOvlSET) {
+    	   exonOverlap= (tj.exons[j]->overlapLen(ti.start-1, ti.end+1) > 0);
+       } else {
+    	   exonOverlap=(ti.overlapLen(tj.exons[j])>=0.8 * ti.len());
+       }
+       if (exonOverlap) {
+          //must not overlap the introns
+          if ((j>0 && ti.start+maxIntronOvl<tj.exons[j]->start)
+             || (j<jmax && ti.end>tj.exons[j]->end+maxIntronOvl))
+             return false;
+          return true;
+       }
+    } //for each exon
+  } else { // not fuzzSpan, strict containment required
     for (int j=0;j<=jmax;j++) {
-       //must NOT overlap the introns
-       if ((j>0 && ti.start<tj.exons[j]->start)
-          || (j<jmax && ti.end>tj.exons[j]->end))
-         return false;
-         //strict containment
-       if (ti.end<=tj.exons[j]->end && ti.start>=tj.exons[j]->start)
-         return true;
+        if (ti.end<=tj.exons[j]->end && ti.start>=tj.exons[j]->start)
+          return true;
     }
  }
  return false;
@@ -204,8 +207,9 @@ GffObj* GffLoader::redundantTranscripts(GffObj& ti, GffObj&  tj) {
   //                 (i.e. they may extend each-other in opposite directions)
 
   //if redundancy is detected, the "bigger" transcript is returned (otherwise NULL is returned)
- if (ti.start>=tj.end || tj.start>=ti.end ||
-		 (tj.strand!='.' && ti.strand!='.' && tj.strand!=ti.strand)) return NULL; //no span overlap at all
+ int adj=dOvlSET ? 1 : 0;
+ if (ti.start>tj.end+adj || tj.start>ti.end+adj ||
+		 (tj.strand!='.' && ti.strand!='.' && tj.strand!=ti.strand)) return NULL; //no span overlap
  int imax=ti.exons.Count()-1;
  int jmax=tj.exons.Count()-1;
  GffObj* bigger=NULL;
@@ -257,8 +261,11 @@ GffObj* GffLoader::redundantTranscripts(GffObj& ti, GffObj&  tj) {
  if (imax==0 && jmax==0) {
      //single-exon transcripts: if fuzzSpan, at least 80% of the shortest one must be overlapped by the other
      if (fuzzSpan) {
-       int minovl = dOvlSET ? 5 : minlen*0.8;
-       return (ti.exons[0]->overlapLen(tj.exons[0])>=minovl) ? bigger : NULL;
+       if (dOvlSET) {
+           return (ti.exons[0]->overlapLen(tj.exons[0]->start-1, tj.exons[0]->end+1)>0) ? bigger : NULL;
+       } else {
+          return (ti.exons[0]->overlapLen(tj.exons[0])>=minlen*0.8) ? bigger : NULL;
+       }
      } else { //boundary containment required
        return (smaller->start>=bigger->start && smaller->end<=bigger->end) ? bigger : NULL;
      }
@@ -288,46 +295,47 @@ GffObj* GffLoader::redundantTranscripts(GffObj& ti, GffObj&  tj) {
     if (eiend<ejstart) { i++; continue; }
     //we found an intron overlap
     break;
-    }
+ }
  if (!fuzzSpan && (bigger->start>smaller->start || bigger->end < smaller->end)) return NULL;
  if ((i>1 && j>1) || i>imax || j>jmax) {
      return NULL; //either no intron overlaps found at all
                   //or it's not the first intron for at least one of the transcripts
-     }
+ }
  if (eistart!=ejstart || eiend!=ejend) return NULL; //not an exact intron match
+ int maxIntronOvl=dOvlSET ? 25 : 0;
  if (j>i) {
    //i==1, ti's start must not conflict with the previous intron of tj
-   if (ti.start<tj.exons[j-1]->start) return NULL;
+   if (ti.start+maxIntronOvl<tj.exons[j-1]->start) return NULL;
+   //comment out the line above if you just want "intron compatibility" (i.e. extension of intron chains )
    //so i's first intron starts AFTER j's first intron
    // then j must contain i, so i's last intron must end with or before j's last intron
    if (ti.exons[imax]->start>tj.exons[jmax]->start) return NULL;
-      //comment out the line above if you just want "intron compatibility" (i.e. extension of intron chains )
-   }
-  else if (i>j) {
-     //j==1, tj's start must not conflict with the previous intron of ti
-     if (tj.start<ti.exons[i-1]->start) return NULL;
-     //so j's intron chain starts AFTER i's
-     // then i must contain j, so j's last intron must end with or before j's last intron
-     if (tj.exons[jmax]->start>ti.exons[imax]->start) return NULL;
-        //comment out the line above for just "intronCompatible()" check (allowing extension of intron chain)
-     }
+ }
+ else if (i>j) {
+   //j==1, tj's start must not conflict with the previous intron of ti
+   if (tj.start+maxIntronOvl<ti.exons[i-1]->start) return NULL;
+   //comment out the line above for just "intronCompatible()" check (allowing extension of intron chain)
+   //so j's intron chain starts AFTER i's
+   // then i must contain j, so j's last intron must end with or before j's last intron
+   if (tj.exons[jmax]->start>ti.exons[imax]->start) return NULL;
+ }
  //now check if the rest of the introns overlap, in the same sequence
  i++;
  j++;
  while (i<=imax && j<=jmax) {
-  if (ti.exons[i-1]->end!=tj.exons[j-1]->end ||
+   if (ti.exons[i-1]->end!=tj.exons[j-1]->end ||
       ti.exons[i]->start!=tj.exons[j]->start) return NULL;
-  i++;
-  j++;
-  }
+   i++;
+   j++;
+ }
  i--;
  j--;
  if (i==imax && j<jmax) {
    // tj has more introns to the right, check if ti's end doesn't conflict with the current tj exon boundary
-   if (ti.end>tj.exons[j]->end) return NULL;
+   if (ti.end>tj.exons[j]->end+maxIntronOvl) return NULL;
    }
  else if (j==jmax && i<imax) {
-   if (tj.end>ti.exons[i]->end) return NULL;
+   if (tj.end>ti.exons[i]->end+maxIntronOvl) return NULL;
    }
  return bigger;
 }
@@ -379,6 +387,7 @@ bool GffLoader::placeGf(GffObj* t, GenomicSeqData* gdata) {
   //	 GMessage("placeGf %s (%d, %d) (%d exons)\n", t->getID(),t->start, t->end, t->exons.Count());
   //}
   //GMessage("DBG>>Placing transcript %s(%d-%d, %d exons)\n", t->getID(), t->start, t->end, t->exons.Count());
+
   if (t->parent==NULL && t->isTranscript()) {
   	int gidx=gdata->gfs.Count()-1;
   	while (gidx>=0 && gdata->gfs[gidx]->end>=t->start) {
@@ -430,14 +439,16 @@ bool GffLoader::placeGf(GffObj* t, GenomicSeqData* gdata) {
 		   tdata=new GTData(t); //additional transcript data
 		   gdata->tdata.Add(tdata);
 	   }
-	   //return true;
 	   noexon_gfs=true; //gene-like record, no exons defined
 	   keep=true;
-    } else
+    } else {
        return false; //nothing to do with these non-transcript objects
+    }
   }
   if (!doCluster) return keep;
+
   if (!keep) return false;
+
   //---- place into a locus
   if (dOvlSET && t->exons.Count()==1) {
 	  //for single exon transcripts temporarily set the strand to '.'
@@ -450,7 +461,13 @@ bool GffLoader::placeGf(GffObj* t, GenomicSeqData* gdata) {
        return true; //new locus on this ref seq
   }
   //--- look for any existing loci overlapping t
-  int nidx=qsearch_gloci(t->end, gdata->loci); //get index of nearest locus starting just ABOVE t->end
+  uint t_end=t->end;
+  uint t_start=t->start;
+  if (dOvlSET) {
+	  t_end++;
+	  t_start--;
+  }
+  int nidx=qsearch_gloci(t_end, gdata->loci); //get index of nearest locus starting just ABOVE t->end
   //GMessage("\tlooking up end coord %d in gdata->loci.. (qsearch got nidx=%d)\n", t->end, nidx);
   if (nidx==0) {
      //cannot have any overlapping loci
@@ -466,17 +483,17 @@ bool GffLoader::placeGf(GffObj* t, GenomicSeqData* gdata) {
   for (int l=nidx-1;l>=0;l--) {
       GffLocus& loc=*(gdata->loci[l]);
       if ((loc.strand=='+' || loc.strand=='-') && t->strand!='.'&& loc.strand!=t->strand) continue;
-      if (t->start>loc.end) {
+      if (t_start>loc.end) {
            if (t->start-loc.start>GFF_MAX_LOCUS) break; //give up already
            continue;
       }
-      if (loc.start>t->end) {
+      if (loc.start>t_end) {
                //this should never be the case if nidx was found correctly
                GMessage("Warning: qsearch_gloci found loc.start>t.end!(t=%s)\n", t->getID());
                continue;
       }
 
-      if (loc.add_gfobj(t)) {
+      if (loc.add_gfobj(t, dOvlSET)) {
          //will add this transcript to loc
          lfound++;
          mrgloci.Add(l);
