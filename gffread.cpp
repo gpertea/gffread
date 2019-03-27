@@ -69,15 +69,19 @@ Misc options: \n\
            features (see --tlf option below); automatic if the input\n\
            filename ends with .tlf)\n\
 Clustering:\n\
- -M/--merge : cluster the input transcripts into loci, collapsing matching\n\
-       transcripts (those with the same exact introns and fully contained)\n\
- -d <dupinfo> : for -M option, write collapsing info to file <dupinfo>\n\
- --cluster-only: same as --merge but without collapsing matching transcripts\n\
- -K    for -M option: also collapse shorter, fully contained transcripts\n\
-       with fewer introns than the container\n\
- -Q    for -M option, remove the containment restriction:\n\
-       (multi-exon transcripts will be collapsed if just their introns match,\n\
-       while single-exon transcripts can partially overlap (80%))\n\
+ -M/--merge : cluster the input transcripts into loci, discarding\n\
+      \"duplicated\" transcripts (those with the same exact introns\n\
+      and fully contained or equal boundaries)\n\
+ -d <dupinfo> : for -M option, write duplication info to file <dupinfo>\n\
+ --cluster-only: same as -M/--merge but without discarding any of the\n\
+      \"duplicate\" transcripts, only create \"locus\" features\n\
+ -K   for -M option: also discard as redundant the shorter, fully contained\n\
+       transcripts (intron chains matching a part of the container)\n\
+ -Q   for -M option, no longer require boundary containment when assessing\n\
+      redundancy (can be combined with -K); only introns have to match for\n\
+      multi-exon transcripts, and >=80% overlap for single-exon transcripts\n\
+ -Y   for -M option, enforce -Q but also discard overlapping single-exon \n\
+      transcripts, even on the opposite strand (can be combined with -K)\n\
 Output options:\n\
  --force-exons: make sure that the lowest level GFF features are considered\n\
        \"exon\" features\n\
@@ -298,6 +302,7 @@ char* getSeqName(char* seqid) {
   if (suf!=NULL) *suf='.';
   return charbuf;
 }
+
 
 int adjust_stopcodon(GffObj& gffrec, int adj, GList<GSeg>* seglst=NULL) {
   //adj>0, extend CDS to include a potential stop codon
@@ -665,7 +670,7 @@ bool process_transcript(GFastaDb& gfasta, GffObj& gffrec) {
 		  GFREE(exont);
 	  }
   } //writing f_w (spliced exons)
-   return true;
+  return true;
 }
 
 void openfw(FILE* &f, GArgs& args, char opt) {
@@ -810,23 +815,23 @@ bool validateGffRec(GffObj* gffrec, GList<GffObj>* gfnew) {
 void printGffObj(FILE* f, GffObj* gfo, GStr& locname, GffPrintMode exonPrinting, int& out_counter) {
     GffObj& t=*gfo;
     GTData* tdata=(GTData*)(t.uptr);
-    if (tdata->replaced_by!=NULL || ((t.udata & 4)!=0)) return;
+    if (tdata->replaced_by!=NULL || !T_PRINTABLE(t.udata)) return;
     //if (t.exons.Count()==0 && t.children.Count()==0 && forceExons)
     //  t.addExonSegment(t.start,t.end);
-    t.udata|=4;
+    T_NO_PRINT(t.udata);
     if (!fmtGFF3 && !gfo->isTranscript())
     	return; //only GFF3 prints non-transcript records (incl. parent genes)
     t.addAttr("locus", locname.chars());
     out_counter++;
     if (fmtGFF3) {
          //print the parent first, if any and if not printed already
-         if (t.parent!=NULL && ((t.parent->udata & 4)==0)) {
+         if (t.parent!=NULL && T_PRINTABLE(t.parent->udata)) {
              GTData* pdata=(GTData*)(t.parent->uptr);
              if (pdata && pdata->geneinfo!=NULL)
                   pdata->geneinfo->finalize();
              t.parent->addAttr("locus", locname.chars());
              t.parent->printGxf(f, exonPrinting, tracklabel, NULL, decodeChars);
-             t.parent->udata|=4;
+             T_NO_PRINT(t.parent->udata);
          }
     }
     t.printGxf(f, exonPrinting, tracklabel, NULL, decodeChars);
@@ -836,7 +841,7 @@ void printGffObj(FILE* f, GffObj* gfo, GStr& locname, GffPrintMode exonPrinting,
 int main(int argc, char* argv[]) {
  GArgs args(argc, argv,
    "version;debug;merge;adj-stop;bed;in-bed;tlf;in-tlf;cluster-only;nc;cov-info;help;"
-    "sort-alpha;keep-genes;keep-comments;force-exons;gene2exon;no-pseudo;sort-by=hvOUNHPWCVJMKQTDARSZFGLEBm:g:i:r:s:l:t:o:w:x:y:d:");
+    "sort-alpha;keep-genes;keep-comments;force-exons;gene2exon;no-pseudo;sort-by=hvOUNHPWCVJMKQYTDARSZFGLEBm:g:i:r:s:l:t:o:w:x:y:d:");
  args.printError(USAGE, true);
  if (args.getOpt('h') || args.getOpt("help")) {
     GMessage("%s",USAGE);
@@ -891,26 +896,28 @@ int main(int argc, char* argv[]) {
  gffloader.gene2exon=(args.getOpt("gene2exon")!=NULL);
  gffloader.matchAllIntrons=(args.getOpt('K')==NULL);
  gffloader.fuzzSpan=(args.getOpt('Q')!=NULL);
+ gffloader.dOvlSET=(args.getOpt('Y')!=NULL);
  if (args.getOpt('M') || args.getOpt("merge")) {
 	 gffloader.doCluster=true;
 	 gffloader.collapseRedundant=true;
-    }
-   else {
-    if (!gffloader.matchAllIntrons || gffloader.fuzzSpan) {
+  } else {
+    if (!gffloader.matchAllIntrons || gffloader.fuzzSpan || gffloader.dOvlSET) {
       GMessage("%s",USAGE);
-      GMessage("Error: -K or -Q options require -M/--merge option!\n");
+      GMessage("Error: options -K,-Q,-Y require -M/--merge option!\n");
       exit(1);
-      }
     }
+ }
  if (args.getOpt("cluster-only")) {
 	 gffloader.doCluster=true;
 	 gffloader.collapseRedundant=false;
-    if (!gffloader.matchAllIntrons || gffloader.fuzzSpan) {
+    if (!gffloader.matchAllIntrons || gffloader.fuzzSpan || gffloader.dOvlSET) {
       GMessage("%s",USAGE);
-      GMessage("Error: -K or -Q options have no effect with --cluster-only.\n");
+      GMessage("Error: option -K,-Q,-Y have no effect with --cluster-only.\n");
       exit(1);
-      }
+    }
  }
+ if (gffloader.dOvlSET)
+	 gffloader.fuzzSpan=true; //-Q enforced by -Y
  covInfo=(args.getOpt("cov-info"));
  if (covInfo) gffloader.doCluster=true; //need to collapse overlapping exons
  if (fullCDSonly) validCDSonly=true;
@@ -1051,7 +1058,7 @@ int main(int argc, char* argv[]) {
    gffloader.openFile(infile);
 
    gffloader.load(g_data, &validateGffRec, &processGffComment);
-
+   // will also place the transcripts in loci, if doCluster is enabled
    if (gffloader.doCluster)
      collectLocusData(g_data, covInfo);
    if (numfiles==0) break;
@@ -1104,26 +1111,28 @@ int main(int argc, char* argv[]) {
          GffObj& t=*(loc.rnas[i]);
          GTData* tdata=(GTData*)(t.uptr);
          if (tdata->replaced_by!=NULL) {
-            if (f_repl && (t.udata & 8)==0) {
-               //t.udata|=8;
+            if (f_repl && T_DUPSHOWABLE(t.udata)) {
                fprintf(f_repl, "%s", t.getID());
                GTData* rby=tdata;
                while (rby->replaced_by!=NULL) {
                   fprintf(f_repl," => %s", rby->replaced_by->getID());
-                  rby->rna->udata|=8;
+                  T_NO_DUPSHOW(rby->rna->udata);
                   rby=(GTData*)(rby->replaced_by->uptr);
                }
                fprintf(f_repl, "\n");
             }
-            t.udata|=4; //not going to print this
+            T_NO_PRINT(t.udata);
             if (verbose) {
-            	GMessage("Info: %s discarded due to being superseded (replaced) by %s\n",
+            	GMessage("Info: %s discarded: superseded by %s\n",
             			t.getID(), tdata->replaced_by->getID());
             }
             continue;
          }
+         //restore strand for dOvlSET
+         char orig_strand=T_OSTRAND(t.udata);
+         if (orig_strand!=0) t.strand=orig_strand;
+
          if (process_transcript(gfasta, t)) {
-             //t.udata|=4; //tag it as valid
              numvalid++;
              if (idxfirstvalid<0) idxfirstvalid=i;
          }
@@ -1168,11 +1177,10 @@ int main(int argc, char* argv[]) {
 			   }
 		   }
        }
-
      }//for each locus
     } //for each genomic sequence
    } //if Clustering enabled
-  else {
+  else { //no clustering
    //not grouped into loci, print the rnas with their parents, if any
    int numvalid=0;
    for (int g=0;g<g_data.Count();g++) {
@@ -1185,8 +1193,8 @@ int main(int argc, char* argv[]) {
          //print other non-transcript (gene?) feature that might be there before t
          while (gfs_i<gdata->gfs.Count() && gdata->gfs[gfs_i]->start<=t.start) {
             GffObj& gfst=*(gdata->gfs[gfs_i]);
-            if ((gfst.udata&4)==0) { //never printed
-              gfst.udata|=4;
+            if T_PRINTABLE(gfst.udata) { //never printed
+              T_NO_PRINT(gfst.udata);
               if (firstGff3Print) { printGff3Header(f_out, args);firstGff3Print=false; }
               if (firstGSeqHeader) { printGSeqHeader(f_out, gdata); firstGSeqHeader=false; }
               gfst.printGxf(f_out, exonPrinting, tracklabel, NULL, decodeChars);
@@ -1198,8 +1206,8 @@ int main(int argc, char* argv[]) {
         if (tdata->replaced_by!=NULL) continue;
         if (process_transcript(gfasta, t)) {
            numvalid++;
-           if (f_out && (t.udata & 4) ==0 ) {
-             t.udata |=4;
+           if (f_out && T_PRINTABLE(t.udata) ) {
+             T_NO_PRINT(t.udata);
              if (fmtGFF3 || t.isTranscript()) {
 				 if (tdata->geneinfo)
 					 tdata->geneinfo->finalize();
@@ -1208,12 +1216,12 @@ int main(int argc, char* argv[]) {
 				 if (firstGff3Print) { printGff3Header(f_out, args);firstGff3Print=false; }
 				 if (firstGSeqHeader) { printGSeqHeader(f_out, gdata); firstGSeqHeader=false; }
 				 //for GFF3, print the parent first, if any
-				 if (fmtGFF3 && t.parent!=NULL && ((t.parent->udata & 4)==0)) {
+				 if (fmtGFF3 && t.parent!=NULL && T_PRINTABLE(t.parent->udata)) {
 					 GTData* pdata=(GTData*)(t.parent->uptr);
 					 if (pdata && pdata->geneinfo!=NULL)
 						  pdata->geneinfo->finalize();
 					 t.parent->printGxf(f_out, exonPrinting, tracklabel, NULL, decodeChars);
-					 t.parent->udata|=4;
+					 T_NO_PRINT(t.parent->udata);
 				 }
 				 t.printGxf(f_out, exonPrinting, tracklabel, NULL, decodeChars);
              }
@@ -1224,8 +1232,8 @@ int main(int argc, char* argv[]) {
      if (f_out && fmtGFF3) {
       while (gfs_i<gdata->gfs.Count()) {
          GffObj& gfst=*(gdata->gfs[gfs_i]);
-         if ((gfst.udata&4)==0) { //never printed
-           gfst.udata|=4;
+         if T_PRINTABLE(gfst.udata) { //never printed
+           T_NO_PRINT(gfst.udata);
            if (firstGff3Print) { printGff3Header(f_out, args); firstGff3Print=false; }
            if (firstGSeqHeader) { printGSeqHeader(f_out, gdata); firstGSeqHeader=false; }
            gfst.printGxf(f_out, exonPrinting, tracklabel, NULL, decodeChars);
