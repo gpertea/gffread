@@ -21,14 +21,14 @@ CXXFLAGS := $(if $(CXXFLAGS),$(BASEFLAGS) $(CXXFLAGS),$(BASEFLAGS))
 
 ifneq (,$(filter %release %static, $(MAKECMDGOALS)))
   # -- release build
-  CXXFLAGS := -g -O3 -DNDEBUG $(CXXFLAGS)
+  CXXFLAGS := -g -O3 -DNDEBUG -std=c++0x $(CXXFLAGS)
 else
   ifneq (,$(filter %profile %gprof %prof, $(MAKECMDGOALS)))
-    CXXFLAGS += -pg -O0 -DNDEBUG
+    CXXFLAGS += -pg -O0 -DNDEBUG -std=c++0x
     LDFLAGS += -pg
   else
     #CXXFLAGS += -g -O0 -DNDEBUG
-    CXXFLAGS += -g -O0 -DDEBUG -D_DEBUG -DGDEBUG
+    CXXFLAGS += -g -O0 -DDEBUG -D_DEBUG -DGDEBUG -std=c++0x
   endif
   ifneq (,$(filter %memcheck %memdebug, $(MAKECMDGOALS)))
      #use sanitizer in gcc 4.9+
