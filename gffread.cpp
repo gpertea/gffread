@@ -4,7 +4,7 @@
 #define __STDC_FORMAT_MACROS
 #include <inttypes.h>
 
-#define VERSION "0.11.1"
+#define VERSION "0.11.2"
 
 #define USAGE "gffread v" VERSION ". Usage:\n\
 gffread <input_gff> [-g <genomic_seqs_fasta> | <dir>][-s <seq_info.fsize>] \n\
@@ -172,7 +172,6 @@ GStr sortBy; //file name with chromosomes listed in the desired order
 //bool keepRefOrder=false; //sort within chromosomes, but follow the input chromosome order -- default!
 
 //bool NoPseudo=false;
-bool forceExons=false;
 bool spliceCheck=false; //only known splice-sites
 bool decodeChars=false; //decode url-encoded chars in attrs (-D)
 bool StarStop=false; //use * instead of . for stop codon translation
@@ -1089,7 +1088,7 @@ int main(int argc, char* argv[]) {
  else if (fmtTLF)
 	exonPrinting=pgffTLF;
  else { //printing regular GFF3
-	exonPrinting = forceExons ? pgffBoth : pgffAny;
+	exonPrinting = gffloader.forceExons ? pgffBoth : pgffAny;
  }
  bool firstGff3Print=fmtGFF3;
  if (gffloader.doCluster) {
