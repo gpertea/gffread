@@ -557,6 +557,7 @@ class GffLoader {
 		bool transcriptsOnly:1;
 		bool gene2exon:1;
 		bool fullAttributes:1;
+		bool keep_AllExonAttrs:1;
 		bool gatherExonAttrs:1;
 		bool mergeCloseExons:1;
 		bool noPseudo:1;

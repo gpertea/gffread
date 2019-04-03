@@ -712,7 +712,7 @@ void GffLoader::load(GList<GenomicSeqData>& seqdata, GFValidateFunc* gf_validate
 	if (BEDinput) gffr->isBED(true);
 	//if (TLFinput) gffr->isTLF(true);
 	gffr->mergeCloseExons(mergeCloseExons);
-	gffr->keepAttrs(fullAttributes, gatherExonAttrs);
+	gffr->keepAttrs(fullAttributes, gatherExonAttrs, keep_AllExonAttrs);
 	gffr->keepGenes(keepGenes);
 	gffr->setRefAlphaSorted(this->sortRefsAlpha);
 	if (keepGff3Comments && gf_parsecomment!=NULL) gffr->setCommentParser(gf_parsecomment);

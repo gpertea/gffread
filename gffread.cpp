@@ -38,7 +38,9 @@ Sorting: (by default, chromosomes are kept in the order they were found)\n\
  --sort-by : sort the reference sequences by the order in which their\n\
       names are given in the <refseq.lst> file\n\
 Misc options: \n\
- -F   full GFF attribute preservation\n\
+ -F   attempt to preserve all GFF attributes preservation\n\
+ --keep-exon-attrs : for -F option, do not attempt to reduce redundant\n\
+      exon/CDS attributes\n\
  -G   do not keep exon attributes, move them to the transcript feature\n\
       (for GFF3 output)\n\
  --keep-genes : in transcript-only mode (default), also preserve gene records\n\
@@ -840,7 +842,7 @@ void printGffObj(FILE* f, GffObj* gfo, GStr& locname, GffPrintMode exonPrinting,
 int main(int argc, char* argv[]) {
  GArgs args(argc, argv,
    "version;debug;merge;adj-stop;bed;in-bed;tlf;in-tlf;cluster-only;nc;cov-info;help;"
-    "sort-alpha;keep-genes;keep-comments;force-exons;gene2exon;no-pseudo;sort-by=hvOUNHPWCVJMKQYTDARSZFGLEBm:g:i:r:s:l:t:o:w:x:y:d:");
+    "sort-alpha;keep-genes;keep-comments;keep-exon-attrs;force-exons;gene2exon;no-pseudo;sort-by=hvOUNHPWCVJMKQYTDARSZFGLEBm:g:i:r:s:l:t:o:w:x:y:d:");
  args.printError(USAGE, true);
  if (args.getOpt('h') || args.getOpt("help")) {
     GMessage("%s",USAGE);
@@ -929,12 +931,17 @@ int main(int argc, char* argv[]) {
   exit(0);
  }
  gffloader.fullAttributes=(args.getOpt('F')!=NULL);
+ gffloader.keep_AllExonAttrs=(args.getOpt("keep-exon-attrs")!=NULL);
+ if (gffloader.keep_AllExonAttrs && !gffloader.fullAttributes) {
+	 GMessage("Error: option --keep-exon-attrs requires option -F !\n");
+	 exit(0);
+ }
  if (args.getOpt('G')==NULL)
 	 gffloader.gatherExonAttrs=!gffloader.fullAttributes;
-   else {
+ else {
 	   gffloader.gatherExonAttrs=true;
 	   gffloader.fullAttributes=true;
-     }
+ }
  if (gffloader.noPseudo && !gffloader.fullAttributes) {
 	 gffloader.gatherExonAttrs=true;
 	 gffloader.fullAttributes=true;
