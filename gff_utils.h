@@ -247,9 +247,9 @@ public:
         const char* gseqname=NULL;
         if (rnas.Count()>0) gseqname=rnas[0]->getGSeqName();
         else gseqname=gfs[0]->getGSeqName();
-        fprintf(f,"%s\t%s\tlocus\t%d\t%d\t.\t%c\t.\tID=%s;locus=%s",
+        fprintf(f,"%s\t%s\tlocus\t%d\t%d\t.\t%c\t.\tID=%s",
                    gseqname, loctrack.chars(), this->start, this->end, this->strand,
-                    locname.chars(), locname.chars());
+                    locname.chars());
         //const char* loc_gname=loc.getGeneName();
         if (this->gene_names.Count()>0) { //print all gene names associated to this locus
              fprintf(f, ";genes=%s",this->gene_names.First()->name.chars());
@@ -560,6 +560,7 @@ class GffLoader {
 		bool keep_AllExonAttrs:1;
 		bool gatherExonAttrs:1;
 		bool mergeCloseExons:1;
+		bool ignoreLocus:1;
 		bool noPseudo:1;
 		bool BEDinput:1;
 		bool TLFinput:1;

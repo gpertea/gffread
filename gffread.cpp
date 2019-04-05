@@ -27,6 +27,7 @@ Options:\n\
  -U   discard single-exon transcripts\n\
  -C   coding only: discard mRNAs that have no CDS features\n\
  --nc non-coding only: discard mRNAs that have CDS features\n\
+ --ignore-locus : discard locus features and attributes found in the input\n\
  -A   use the description field from <seq_info.fsize> and add it\n\
       as the value for a 'descr' attribute to the GFF record\n\
  -s   <seq_info.fsize> is a tab-delimited file providing this info\n\
@@ -842,7 +843,8 @@ void printGffObj(FILE* f, GffObj* gfo, GStr& locname, GffPrintMode exonPrinting,
 int main(int argc, char* argv[]) {
  GArgs args(argc, argv,
    "version;debug;merge;adj-stop;bed;in-bed;tlf;in-tlf;cluster-only;nc;cov-info;help;"
-    "sort-alpha;keep-genes;keep-comments;keep-exon-attrs;force-exons;gene2exon;no-pseudo;sort-by=hvOUNHPWCVJMKQYTDARSZFGLEBm:g:i:r:s:l:t:o:w:x:y:d:");
+    "sort-alpha;keep-genes;keep-comments;keep-exon-attrs;force-exons;gene2exon;"
+    "ignore-locus;no-pseudo;sort-by=hvOUNHPWCVJMKQYTDARSZFGLEBm:g:i:r:s:l:t:o:w:x:y:d:");
  args.printError(USAGE, true);
  if (args.getOpt('h') || args.getOpt("help")) {
     GMessage("%s",USAGE);
@@ -853,6 +855,7 @@ int main(int argc, char* argv[]) {
  decodeChars=(args.getOpt('D')!=NULL);
  gffloader.forceExons=(args.getOpt("force-exons")!=NULL);
  gffloader.noPseudo=(args.getOpt("no-pseudo")!=NULL);
+ gffloader.ignoreLocus=(args.getOpt("ignore-locus")!=NULL);
  gffloader.transcriptsOnly=(args.getOpt('O')==NULL);
  //sortByLoc=(args.getOpt('S')!=NULL);
  addDescr=(args.getOpt('A')!=NULL);

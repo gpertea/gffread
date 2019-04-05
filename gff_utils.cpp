@@ -714,6 +714,7 @@ void GffLoader::load(GList<GenomicSeqData>& seqdata, GFValidateFunc* gf_validate
 	gffr->mergeCloseExons(mergeCloseExons);
 	gffr->keepAttrs(fullAttributes, gatherExonAttrs, keep_AllExonAttrs);
 	gffr->keepGenes(keepGenes);
+	gffr->setIgnoreLocus(ignoreLocus);
 	gffr->setRefAlphaSorted(this->sortRefsAlpha);
 	if (keepGff3Comments && gf_parsecomment!=NULL) gffr->setCommentParser(gf_parsecomment);
 	gffr->readAll();
