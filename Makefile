@@ -10,7 +10,8 @@ LINKER  := $(if $(LINKER),$(LINKER),g++)
 LDFLAGS := $(if $(LDFLAGS),$(LDFLAGS),-g)
 
 BASEFLAGS  := -Wall -Wextra ${SEARCHDIRS} -D_FILE_OFFSET_BITS=64 \
--D_LARGEFILE_SOURCE -D_REENTRANT -fno-strict-aliasing -fno-exceptions -fno-rtti
+-D_LARGEFILE_SOURCE -D_REENTRANT -fno-strict-aliasing \
+ -std=c++0x -fno-exceptions -fno-rtti
 
 GCCV8 := $(shell expr `g++ -dumpversion | cut -f1 -d.` \>= 8)
 ifeq "$(GCCV8)" "1"
@@ -21,14 +22,14 @@ CXXFLAGS := $(if $(CXXFLAGS),$(BASEFLAGS) $(CXXFLAGS),$(BASEFLAGS))
 
 ifneq (,$(filter %release %static, $(MAKECMDGOALS)))
   # -- release build
-  CXXFLAGS := -g -O3 -DNDEBUG -std=c++0x $(CXXFLAGS)
+  CXXFLAGS := -g -O3 -DNDEBUG $(CXXFLAGS)
 else
   ifneq (,$(filter %profile %gprof %prof, $(MAKECMDGOALS)))
-    CXXFLAGS += -pg -O0 -DNDEBUG -std=c++0x
+    CXXFLAGS += -pg -O0 -DNDEBUG
     LDFLAGS += -pg
   else
     #CXXFLAGS += -g -O0 -DNDEBUG
-    CXXFLAGS += -g -O0 -DDEBUG -D_DEBUG -DGDEBUG -std=c++0x
+    CXXFLAGS += -g -O0 -DDEBUG -D_DEBUG -DGDEBUG
   endif
   ifneq (,$(filter %memcheck %memdebug, $(MAKECMDGOALS)))
      #use sanitizer in gcc 4.9+
