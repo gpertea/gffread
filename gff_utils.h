@@ -565,6 +565,7 @@ class GffLoader {
 		bool BEDinput:1;
 		bool TLFinput:1;
 		bool keepGenes:1;
+		bool trAdoption:1; //orphan transcript adoption by the container gene
 		bool keepGff3Comments:1;
 		bool sortRefsAlpha:1;
 		bool doCluster:1;

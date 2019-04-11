@@ -388,11 +388,11 @@ bool GffLoader::placeGf(GffObj* t, GenomicSeqData* gdata) {
   //}
   //GMessage("DBG>>Placing transcript %s(%d-%d, %d exons)\n", t->getID(), t->start, t->end, t->exons.Count());
 
-  if (t->parent==NULL && t->isTranscript()) {
+  if (t->parent==NULL && t->isTranscript() && trAdoption) {
   	int gidx=gdata->gfs.Count()-1;
   	while (gidx>=0 && gdata->gfs[gidx]->end>=t->start) {
   		GffObj& g = *(gdata->gfs[gidx]);
-  		//find a container gene object for this transcript
+  		//try to find a container gene object for this transcript
   		//if (g.isGene() && t->strand==g.strand && exonOverlap2Gene(t, g)) {
   		if (g.isGene() && (t->strand=='.' || t->strand==g.strand) && g.exons.Count()==0
   				  && t->start>=g.start && t->end<=g.end) {
@@ -403,7 +403,7 @@ bool GffLoader::placeGf(GffObj* t, GenomicSeqData* gdata) {
   		       tdata=new GTData(t); //additional transcript data
   		       gdata->tdata.Add(tdata);
   			}
-  			if (t->parent==NULL) t->parent=&g;
+  			t->parent=&g;
   			//disable printing of gene if transcriptsOnly and --keep-genes wasn't given
   			if (transcriptsOnly && !keepGenes) {
   				T_NO_PRINT(g.udata); //tag it as non-printable

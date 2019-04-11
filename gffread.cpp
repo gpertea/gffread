@@ -4,7 +4,7 @@
 #define __STDC_FORMAT_MACROS
 #include <inttypes.h>
 
-#define VERSION "0.11.2"
+#define VERSION "0.11.3"
 
 #define USAGE "gffread v" VERSION ". Usage:\n\
 gffread <input_gff> [-g <genomic_seqs_fasta> | <dir>][-s <seq_info.fsize>] \n\
@@ -90,6 +90,8 @@ Output options:\n\
        \"exon\" features\n\
  --gene2exon: for single-line genes not parenting any transcripts, add an\n\
        exon feature spanning the entire gene (treat it as a transcript)\n\
+ --t-adopt:  try to find a parent gene overlapping/containing a transcript\n\
+       that does not have any explicit gene Parent\n\
  -D    decode url encoded characters within attributes\n\
  -Z    merge very close exons into a single exon (when intron size<4)\n\
  -g   full path to a multi-fasta file with the genomic sequences\n\
@@ -843,7 +845,7 @@ void printGffObj(FILE* f, GffObj* gfo, GStr& locname, GffPrintMode exonPrinting,
 int main(int argc, char* argv[]) {
  GArgs args(argc, argv,
    "version;debug;merge;adj-stop;bed;in-bed;tlf;in-tlf;cluster-only;nc;cov-info;help;"
-    "sort-alpha;keep-genes;keep-comments;keep-exon-attrs;force-exons;gene2exon;"
+    "sort-alpha;keep-genes;keep-comments;keep-exon-attrs;force-exons;t-adopt;gene2exon;"
     "ignore-locus;no-pseudo;sort-by=hvOUNHPWCVJMKQYTDARSZFGLEBm:g:i:r:s:l:t:o:w:x:y:d:");
  args.printError(USAGE, true);
  if (args.getOpt('h') || args.getOpt("help")) {
@@ -887,6 +889,7 @@ int main(int argc, char* argv[]) {
  StarStop=(args.getOpt('S')!=NULL);
 
  gffloader.keepGenes=(args.getOpt("keep-genes")!=NULL);
+ gffloader.trAdoption=(args.getOpt("t-adopt")!=NULL);
  gffloader.keepGff3Comments=(args.getOpt("keep-comments")!=NULL);
  gffloader.sortRefsAlpha=(args.getOpt("sort-alpha")!=NULL);
  if (args.getOpt("sort-by")!=NULL) {
