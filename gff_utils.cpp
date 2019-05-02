@@ -3,7 +3,7 @@
 bool verbose=false; //same with GffReader::showWarnings and GffLoader::beVserbose
 
 //bool debugState=false;
-
+/*
 void printTabFormat(FILE* f, GffObj* t) {
 	static char dbuf[1024];
 	fprintf(f, "%s\t%s\t%c\t%d\t%d\t%d\t", t->getID(), t->getGSeqName(), t->strand, t->start, t->end, t->exons.Count());
@@ -26,6 +26,7 @@ void printTabFormat(FILE* f, GffObj* t) {
 	}
 	fprintf(f, "\n");
 }
+*/
 
 void printFasta(FILE* f, GStr& defline, char* seq, int seqlen, bool useStar) {
  if (seq==NULL) return;

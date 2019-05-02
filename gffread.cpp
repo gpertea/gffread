@@ -4,16 +4,19 @@
 #define __STDC_FORMAT_MACROS
 #include <inttypes.h>
 
-#define VERSION "0.11.3"
+#define VERSION "0.11.4"
 
 #define USAGE "gffread v" VERSION ". Usage:\n\
 gffread <input_gff> [-g <genomic_seqs_fasta> | <dir>][-s <seq_info.fsize>] \n\
- [-o <outfile.gff>] [-t <tname>] [-r [[<strand>]<chr>:]<start>..<end> [-R]]\n\
+ [-o <outfile>] [-t <trackname>] [-r [[<strand>]<chr>:]<start>..<end> [-R]]\n\
  [-CTVNJMKQAFPGUBHZWTOLE] [-w <exons.fa>] [-x <cds.fa>] [-y <tr_cds.fa>]\n\
- [-i <maxintron>] [--sort-by <refseq_list.txt>] \n\
+ [-i <maxintron>] [--bed] [--table <attrlist>] [--sort-by <refseq_list.txt>]\n\
  \n\
- Filter and convert GFF3/GTF2 records, extract corresponding sequences etc.\n\
- By default (i.e. without -O) only process transcripts, ignore other features.\n\
+ Filter, convert or cluster GFF/GTF/BED records, extract the sequence of\n\
+ transcripts (exon or CDS) and more.\n\
+ By default (i.e. without -O) only transcripts are processed, discarding any\n\
+ other non-transcript features. Default output is a simplified GFF3 with only\n\
+ the basic attributes.\n\
  \n\
  <input_gff> is a GFF file, use '-' for stdin\n\
  \n\
@@ -39,7 +42,7 @@ Sorting: (by default, chromosomes are kept in the order they were found)\n\
  --sort-by : sort the reference sequences by the order in which their\n\
       names are given in the <refseq.lst> file\n\
 Misc options: \n\
- -F   attempt to preserve all GFF attributes preservation\n\
+ -F   preserve all GFF attributes (for non-exon features)\n\
  --keep-exon-attrs : for -F option, do not attempt to reduce redundant\n\
       exon/CDS attributes\n\
  -G   do not keep exon attributes, move them to the transcript feature\n\
@@ -111,16 +114,19 @@ Output options:\n\
        WARNING: all GFF records on reference sequences whose original IDs\n\
        are not found in the 1st column of this table will be discarded!\n\
  -t    use <trackname> in the 2nd column of each GFF/GTF output line\n\
- -o    print the GFF records to <outfile.gff> (those that passed any\n\
-       given filters). Use -o- to enable printing of to stdout\n\
- -T    for -o, output will be GTF instead of GFF3\n\
- --bed for -o, output BED format instead of GFF3\n\
- --tlf for -o, output \"transcript line format\" which is like GFF\n\
+ -o    write the records into <outfile> instead of stdout\n\
+ -T    main output will be GTF instead of GFF3\n\
+ --bed output records in BED format instead of default GFF3\n\
+ --tlf output \"transcript line format\" which is like GFF\n\
        but exons, CDS features and related data are stored as GFF \n\
        attributes in the transcript feature line, like this:\n\
          exoncount=N;exons=<exons>;CDSphase=<N>;CDS=<CDScoords> \n\
-      <exons> is a comma-delimited list of exon_start-exon_end coordinates;\n\
-      <CDScoords> is CDS_start:CDS_end coordinates or a list like <exons>;\n\
+       <exons> is a comma-delimited list of exon_start-exon_end coordinates;\n\
+       <CDScoords> is CDS_start:CDS_end coordinates or a list like <exons>\n\
+ --table output a simple tab delimited format instead of GFF, with columns\n\
+       having the values of GFF attributes given in <attrlist>; special\n\
+       pseudo-attributes (prefixed by @) are recognized:\n\
+       @chr, @start, @end, @strand, @numexons, @exons, @cds, @covlen, @cdslen\n\
  -v,-E expose (warn about) duplicate transcript IDs and other potential\n\
        problems with the given GFF/GTF records\n\
 "
@@ -151,6 +157,30 @@ class RefTran {
       }
 };
 
+enum ETableFieldType {
+  ctfGFF_Attr=0, // attribute name as is
+  ctfGFF_ID, //ID or @id
+  ctfGFF_Parent, //Parent or @parent
+  ctfGFF_chr, //@chr
+  ctfGFF_feature, //@feature
+  ctfGFF_start, //@start
+  ctfGFF_end, //@end
+  ctfGFF_strand, //@strand
+  ctfGFF_numexons, //@numexons
+  ctfGFF_exons, //@exons
+  ctfGFF_cds, //@cds
+  ctfGFF_covlen, //@covlen
+  ctfGFF_cdslen//@cdslen
+};
+
+class CTableField {
+ public:
+   ETableFieldType type;
+   GStr name; //only for type ctfGFF_Attr
+   CTableField(ETableFieldType atype=ctfGFF_Attr):type(atype) { }
+   CTableField(GStr& attrname):type(ctfGFF_Attr),name(attrname) { }
+};
+
 FILE* ffasta=NULL;
 FILE* f_in=NULL;
 FILE* f_out=NULL;
@@ -175,7 +205,7 @@ bool covInfo=false; // --cov-info : only report genome coverage
 //bool sortAlpha=false;
 GStr sortBy; //file name with chromosomes listed in the desired order
 //bool keepRefOrder=false; //sort within chromosomes, but follow the input chromosome order -- default!
-
+GStr tableFormat; //list of "attributes" to print in tab delimited format
 //bool NoPseudo=false;
 bool spliceCheck=false; //only known splice-sites
 bool decodeChars=false; //decode url-encoded chars in attrs (-D)
@@ -195,6 +225,7 @@ bool fmtGFF3=true; //default output: GFF3
 bool fmtGTF=false;
 bool fmtBED=false;
 bool fmtTLF=false;
+bool fmtTable=false;
 bool addDescr=false;
 //bool protmap=false;
 bool multiExon=false;
@@ -222,6 +253,9 @@ GHash<GeneInfo> gene_ids;
 
 bool debugMode=false;
 //bool verbose=false;
+
+
+GVec<CTableField> tableCols; //table output format fields
 
 void loadSeqInfo(FILE* f, GHash<SeqInfo> &si) {
   GLineReader fr(f);
@@ -251,6 +285,50 @@ void loadSeqInfo(FILE* f, GHash<SeqInfo> &si) {
       // --- here we have finished parsing the line
       si.Add(id, new SeqInfo(len,text));
       } //while lines
+}
+
+void setTableFormat(GStr& s) {
+	 if (s.is_empty()) return;
+	 GHash<ETableFieldType> specialFields;
+	 specialFields.Add("chr", new ETableFieldType(ctfGFF_chr));
+	 specialFields.Add("id", new ETableFieldType(ctfGFF_ID));
+	 specialFields.Add("parent", new ETableFieldType(ctfGFF_Parent));
+	 specialFields.Add("feature", new ETableFieldType(ctfGFF_feature));
+	 specialFields.Add("start", new ETableFieldType(ctfGFF_start));
+	 specialFields.Add("end", new ETableFieldType(ctfGFF_end));
+	 specialFields.Add("strand", new ETableFieldType(ctfGFF_strand));
+	 specialFields.Add("numexons", new ETableFieldType(ctfGFF_numexons));
+	 specialFields.Add("exons", new ETableFieldType(ctfGFF_exons));
+	 specialFields.Add("cds", new ETableFieldType(ctfGFF_cds));
+	 specialFields.Add("covlen", new ETableFieldType(ctfGFF_covlen));
+	 specialFields.Add("cdslen", new ETableFieldType(ctfGFF_cdslen));
+
+	 s.startTokenize(" ,;.:", tkCharSet);
+	 GStr w;
+	 while (s.nextToken(w)) {
+      if (w[0]=='@') {
+    	  w=w.substr(1);
+    	  ETableFieldType* v=specialFields.Find(w.chars());
+    	  if (v!=NULL) {
+    		  CTableField tcol(*v);
+    		  tableCols.Add(tcol);
+    	  }
+    	  else GMessage("Warning: table field '@%s' not recognized!\n",w.chars());
+    	  continue;
+      }
+      if (w=="ID") {
+    	  CTableField tcol(ctfGFF_ID);
+    	  tableCols.Add(tcol);
+    	  continue;
+      }
+      if (w=="Parent") {
+    	  CTableField tcol(ctfGFF_Parent);
+    	  tableCols.Add(tcol);
+    	  continue;
+      }
+      CTableField col(w);
+      tableCols.Add(col);
+	 }
 }
 
 void loadRefTable(FILE* f, GHash<RefTran>& rt) {
@@ -349,16 +427,6 @@ bool process_transcript(GFastaDb& gfasta, GffObj& gffrec) {
  //returns true if the transcript passed the filter
  char* gname=gffrec.getGeneName();
  if (gname==NULL) gname=gffrec.getGeneID();
- /*
- if (f_out) { //remove transcript_name, convert it to Name for GFF3 output -- should we?
-     const char* tname=NULL;
-     if ((tname=gffrec.getAttr("transcript_name"))!=NULL &&
-    		 gffrec.getAttr("Name")==NULL) {
-        gffrec.addAttr("Name", tname);
-        gffrec.removeAttr("transcript_name");
-     }
- }
- */
  if (ensembl_convert && startsWith(gffrec.getID(), "ENS")) {
       const char* biotype=gffrec.getAttr("gene_biotype");
       if (biotype) {
@@ -678,15 +746,15 @@ bool process_transcript(GFastaDb& gfasta, GffObj& gffrec) {
 }
 
 void openfw(FILE* &f, GArgs& args, char opt) {
-  GStr s=args.getOpt(opt);
-  if (!s.is_empty()) {
-      if (s=='-')
-       f=stdout;
-      else {
-       f=fopen(s,"w");
-       if (f==NULL) GError("Error creating file: %s\n", s.chars());
-       }
-     }
+	GStr s=args.getOpt(opt);
+	if (!s.is_empty()) {
+		if (s=='-')
+			f=stdout;
+		else {
+			f=fopen(s,"w");
+			if (f==NULL) GError("Error creating file: %s\n", s.chars());
+		}
+	}
 }
 
 #define FWCLOSE(fh) if (fh!=NULL && fh!=stdout) fclose(fh)
@@ -842,11 +910,104 @@ void printGffObj(FILE* f, GffObj* gfo, GStr& locname, GffPrintMode exonPrinting,
 }
 
 
+void printGxfTab(FILE* f, GffObj& g) {
+ //using attribute list in tableCols
+	char* av=NULL;
+	for(int i=0;i<tableCols.Count();i++) {
+		if (i>0) fprintf(f,"\t");
+		switch(tableCols[i].type) {
+		case ctfGFF_Attr:
+			av=g.getAttr(tableCols[i].name.chars());
+			if (av!=NULL) fprintf(f,"%s",av);
+			else fprintf(f, ".");
+			break;
+		case ctfGFF_chr:
+			fprintf(f,"%s",g.getGSeqName());
+			break;
+		case ctfGFF_ID:
+			fprintf(f,"%s",g.getID());
+			break;
+		case ctfGFF_Parent:
+			if (g.parent!=NULL) fprintf(f,"%s",g.parent->getID());
+			else fprintf(f, ".");
+			break;
+		case ctfGFF_feature:
+			fprintf(f,"%s",g.getFeatureName());
+			break;
+		case ctfGFF_start:
+			fprintf(f,"%d",g.start);
+			break;
+		case ctfGFF_end:
+			fprintf(f,"%d",g.end);
+			break;
+		case ctfGFF_strand:
+			fprintf(f,"%c",g.strand);
+			break;
+		case ctfGFF_numexons:
+			fprintf(f,"%d",g.exons.Count());
+			break;
+		case ctfGFF_exons:
+			if (g.exons.Count()>0) {
+				for (int x=0;x<g.exons.Count();x++) {
+					if (x>0) fprintf(f,",");
+					fprintf(f,"%d-%d",g.exons[x]->start, g.exons[x]->end);
+				}
+			} else fprintf(f,".");
+			break;
+		case ctfGFF_cds:
+			if (g.hasCDS()) {
+				GVec<GffExon> cds;
+				g.getCDSegs(cds);
+				for (int x=0;x<cds.Count();x++) {
+					if (x>0) fprintf(f,",");
+				    fprintf(f,"%d-%d",cds[x].start, cds[x].end);
+				}
+			}
+			else fprintf(f,".");
+			break;
+		case ctfGFF_covlen:
+			fprintf(f, "%d", g.covlen);
+			break;
+		case ctfGFF_cdslen:
+			if (g.hasCDS()) {
+				GVec<GffExon> cds;
+				g.getCDSegs(cds);
+				int clen=0;
+				for (int x=0;x<cds.Count();x++)
+				    clen+=cds[x].end-cds[x].start+1;
+				fprintf(f, "%d", clen);
+			}
+			else fprintf(f, "0");
+			break;
+		}
+	}
+	fprintf(f,"\n");
+}
+
+void printAsTable(FILE* f, GffObj* gfo, int* out_counter=NULL) {
+    GffObj& t=*gfo;
+    GTData* tdata=(GTData*)(t.uptr);
+    if (tdata->replaced_by!=NULL || !T_PRINTABLE(t.udata)) return;
+    T_NO_PRINT(t.udata);
+    if (out_counter!=NULL) (*out_counter)++;
+	 //print the parent first, if any and if not printed already
+	 if (t.parent!=NULL && T_PRINTABLE(t.parent->udata)) {
+		 GTData* pdata=(GTData*)(t.parent->uptr);
+		 if (pdata && pdata->geneinfo!=NULL)
+			  pdata->geneinfo->finalize();
+		 //t.parent->addAttr("locus", locname.chars());
+		 //(*out_counter)++; ?
+		 printGxfTab(f, *t.parent);
+		 T_NO_PRINT(t.parent->udata);
+	 }
+    printGxfTab(f, *gfo);
+}
+
 int main(int argc, char* argv[]) {
  GArgs args(argc, argv,
    "version;debug;merge;adj-stop;bed;in-bed;tlf;in-tlf;cluster-only;nc;cov-info;help;"
     "sort-alpha;keep-genes;keep-comments;keep-exon-attrs;force-exons;t-adopt;gene2exon;"
-    "ignore-locus;no-pseudo;sort-by=hvOUNHPWCVJMKQYTDARSZFGLEBm:g:i:r:s:l:t:o:w:x:y:d:");
+    "ignore-locus;no-pseudo;table=sort-by=hvOUNHPWCVJMKQYTDARSZFGLEBm:g:i:r:s:l:t:o:w:x:y:d:");
  args.printError(USAGE, true);
  if (args.getOpt('h') || args.getOpt("help")) {
     GMessage("%s",USAGE);
@@ -899,7 +1060,6 @@ int main(int argc, char* argv[]) {
  }
  if (!sortBy.is_empty())
 	   gffloader.loadRefNames(sortBy);
-
  gffloader.gene2exon=(args.getOpt("gene2exon")!=NULL);
  gffloader.matchAllIntrons=(args.getOpt('K')==NULL);
  gffloader.fuzzSpan=(args.getOpt('Q')!=NULL);
@@ -957,6 +1117,14 @@ int main(int argc, char* argv[]) {
     gffloader.fullAttributes=true;
     gffloader.gatherExonAttrs=false;
     //sortByLoc=true;
+ }
+
+ tableFormat=args.getOpt("table");
+ if (!tableFormat.is_empty()) {
+	 setTableFormat(tableFormat);
+	 fmtTable=true;
+	 fmtGFF3=false;
+	 gffloader.fullAttributes=true;
  }
 
  gffloader.mergeCloseExons=(args.getOpt('Z')!=NULL);
@@ -1043,6 +1211,9 @@ int main(int argc, char* argv[]) {
  openfw(f_w, args, 'w');
  openfw(f_x, args, 'x');
  openfw(f_y, args, 'y');
+
+ if (f_out==NULL && f_w==NULL && f_x==NULL && f_y==NULL)
+	 f_out=stdout;
  //if (f_y!=NULL || f_x!=NULL) wCDSonly=true;
  //useBadCDS=useBadCDS || (fgtfok==NULL && fgtfbad==NULL && f_y==NULL && f_x==NULL);
 
@@ -1183,7 +1354,8 @@ int main(int argc, char* argv[]) {
 					    	 firstLocusPrint=false;
 					     }
 				       }
-				       printGffObj(f_out, loc.rnas[rnas_i], locname, exonPrinting, out_counter);
+				       if (fmtTable)  printAsTable(f_out, loc.rnas[rnas_i], &out_counter);
+				       else printGffObj(f_out, loc.rnas[rnas_i], locname, exonPrinting, out_counter);
 					   ++rnas_i;
 			   }
 		   }
@@ -1200,18 +1372,21 @@ int main(int argc, char* argv[]) {
      int gfs_i=0;
      for (int m=0;m<gdata->rnas.Count();m++) {
         GffObj& t=*(gdata->rnas[m]);
-        if (f_out && fmtGFF3) {
+        if (f_out && (fmtGFF3 || fmtTable)) {
          //print other non-transcript (gene?) feature that might be there before t
-         while (gfs_i<gdata->gfs.Count() && gdata->gfs[gfs_i]->start<=t.start) {
-            GffObj& gfst=*(gdata->gfs[gfs_i]);
-            if T_PRINTABLE(gfst.udata) { //never printed
-              T_NO_PRINT(gfst.udata);
-              if (firstGff3Print) { printGff3Header(f_out, args);firstGff3Print=false; }
-              if (firstGSeqHeader) { printGSeqHeader(f_out, gdata); firstGSeqHeader=false; }
-              gfst.printGxf(f_out, exonPrinting, tracklabel, NULL, decodeChars);
-            }
-            ++gfs_i;
-         }
+           while (gfs_i<gdata->gfs.Count() && gdata->gfs[gfs_i]->start<=t.start) {
+             GffObj& gfst=*(gdata->gfs[gfs_i]);
+             if T_PRINTABLE(gfst.udata) { //never printed
+               T_NO_PRINT(gfst.udata);
+               if (fmtGFF3) {
+                 if (firstGff3Print) { printGff3Header(f_out, args);firstGff3Print=false; }
+                 if (firstGSeqHeader) { printGSeqHeader(f_out, gdata); firstGSeqHeader=false; }
+                 gfst.printGxf(f_out, exonPrinting, tracklabel, NULL, decodeChars);
+               }
+               else printGxfTab(f_out, gfst);
+             }
+             ++gfs_i;
+           }
         }
         GTData* tdata=(GTData*)(t.uptr);
         if (tdata->replaced_by!=NULL) continue;
@@ -1219,36 +1394,46 @@ int main(int argc, char* argv[]) {
            numvalid++;
            if (f_out && T_PRINTABLE(t.udata) ) {
              T_NO_PRINT(t.udata);
-             if (fmtGFF3 || t.isTranscript()) {
+             if (fmtGFF3 || fmtTable || t.isTranscript()) {
 				 if (tdata->geneinfo)
 					 tdata->geneinfo->finalize();
 				 out_counter++;
-				 // if (fmtGTF) t.printGxf(f_out, exonPrinting, tracklabel, NULL, decodeChars);
-				 if (firstGff3Print) { printGff3Header(f_out, args);firstGff3Print=false; }
-				 if (firstGSeqHeader) { printGSeqHeader(f_out, gdata); firstGSeqHeader=false; }
-				 //for GFF3, print the parent first, if any
-				 if (fmtGFF3 && t.parent!=NULL && T_PRINTABLE(t.parent->udata)) {
+				 if (fmtGFF3) {
+				   if (firstGff3Print) { printGff3Header(f_out, args);firstGff3Print=false; }
+				   if (firstGSeqHeader) { printGSeqHeader(f_out, gdata); firstGSeqHeader=false; }
+				 }
+				 //for GFF3 && table output, print the parent first, if any
+				 if ((fmtGFF3 || fmtTable) && t.parent!=NULL && T_PRINTABLE(t.parent->udata)) {
 					 GTData* pdata=(GTData*)(t.parent->uptr);
 					 if (pdata && pdata->geneinfo!=NULL)
 						  pdata->geneinfo->finalize();
-					 t.parent->printGxf(f_out, exonPrinting, tracklabel, NULL, decodeChars);
+					 if (fmtTable)
+						 printGxfTab(f_out, *(t.parent));
+					 else
+						 t.parent->printGxf(f_out, exonPrinting, tracklabel, NULL, decodeChars);
 					 T_NO_PRINT(t.parent->udata);
 				 }
-				 t.printGxf(f_out, exonPrinting, tracklabel, NULL, decodeChars);
+				 if (fmtTable)
+					 printGxfTab(f_out, t);
+				 else
+					 t.printGxf(f_out, exonPrinting, tracklabel, NULL, decodeChars);
              }
            }//GFF/GTF output requested
         } //valid transcript
      } //for each rna
      //print the rest of the isolated pseudo/gene/region features not printed yet
-     if (f_out && fmtGFF3) {
+     if (f_out && (fmtGFF3 || fmtTable)) {
       while (gfs_i<gdata->gfs.Count()) {
          GffObj& gfst=*(gdata->gfs[gfs_i]);
          if T_PRINTABLE(gfst.udata) { //never printed
            T_NO_PRINT(gfst.udata);
-           if (firstGff3Print) { printGff3Header(f_out, args); firstGff3Print=false; }
-           if (firstGSeqHeader) { printGSeqHeader(f_out, gdata); firstGSeqHeader=false; }
-           gfst.printGxf(f_out, exonPrinting, tracklabel, NULL, decodeChars);
-           }
+           if (fmtGFF3) {
+              if (firstGff3Print) { printGff3Header(f_out, args); firstGff3Print=false; }
+              if (firstGSeqHeader) { printGSeqHeader(f_out, gdata); firstGSeqHeader=false; }
+              gfst.printGxf(f_out, exonPrinting, tracklabel, NULL, decodeChars);
+           } else
+              printGxfTab(f_out, gfst);
+         }
          ++gfs_i;
       }
      }
