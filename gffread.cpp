@@ -1212,7 +1212,7 @@ int main(int argc, char* argv[]) {
  openfw(f_x, args, 'x');
  openfw(f_y, args, 'y');
 
- if (f_out==NULL && f_w==NULL && f_x==NULL && f_y==NULL)
+ if (f_out==NULL && f_w==NULL && f_x==NULL && f_y==NULL && !covInfo)
 	 f_out=stdout;
  //if (f_y!=NULL || f_x!=NULL) wCDSonly=true;
  //useBadCDS=useBadCDS || (fgtfok==NULL && fgtfbad==NULL && f_y==NULL && f_x==NULL);
