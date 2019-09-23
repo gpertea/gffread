@@ -10,7 +10,8 @@ LINKER  := $(if $(LINKER),$(LINKER),g++)
 LDFLAGS := $(if $(LDFLAGS),$(LDFLAGS),-g)
 
 BASEFLAGS  := -Wall -Wextra ${SEARCHDIRS} -D_FILE_OFFSET_BITS=64 \
--D_LARGEFILE_SOURCE -D_REENTRANT -fno-strict-aliasing -fno-exceptions -fno-rtti
+-D_LARGEFILE_SOURCE -D_REENTRANT -fno-strict-aliasing \
+ -std=c++0x -fno-exceptions -fno-rtti
 
 GCCV8 := $(shell expr `g++ -dumpversion | cut -f1 -d.` \>= 8)
 ifeq "$(GCCV8)" "1"

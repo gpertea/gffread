@@ -4,9 +4,27 @@
 #include "GStr.h"
 #include "GFaSeqGet.h"
 
+extern bool verbose;
 extern bool debugMode;
 
 typedef bool GFValidateFunc(GffObj* gf, GList<GffObj>* gfadd);
+
+//test if a transcript should be printed (and not printed yet)
+#define T_PRINTABLE(d) (((d) & 0x100)==0)
+
+//set a transcript to not be printed
+#define T_NO_PRINT(d) d |= 0x100
+
+//test if a duplicate transcript should be shown in the duplicate info file
+#define T_DUPSHOWABLE(d) (((d) & 0x200)==0)
+
+//set a duplicate transcript to not be shown in the duplicate info file
+#define T_NO_DUPSHOW(d) d |= 0x200
+
+//check original/old strand:
+#define T_OSTRAND(d) (d & 0xFF)
+//keep/set original/old strand
+#define T_SET_OSTRAND(d, s) d |= s
 
 class GeneInfo { //for Ensembl GTF conversion
  public:
@@ -17,7 +35,7 @@ class GeneInfo { //for Ensembl GTF conversion
    GeneInfo():gene_names(true, true, true), transcripts(true,true,true) {
      gf=NULL;
      flag=0;
-     }
+   }
    GeneInfo(GffObj* gfrec, bool ensembl_convert=false):gene_names(true, true, true),
                     transcripts(true,true,true) {
      flag=0;
@@ -96,22 +114,22 @@ class GffLocus;
 
 class GTData { //transcript associated data
  public:
-    GffObj* rna;
-    GffLocus* locus;
-    GffObj* replaced_by;
-    GeneInfo* geneinfo;
-    int flag;
-    GTData(GffObj* t=NULL) {
-        rna=t;
-        flag=0;
-        locus=NULL;
-        replaced_by=NULL;
-        geneinfo=NULL;
-        if (rna!=NULL) {
-            geneinfo=(GeneInfo*)rna->uptr; //take over geneinfo, if there
-            rna->uptr=this;
-            }
-        }
+   GffObj* rna;
+   GffLocus* locus;
+   GffObj* replaced_by;
+   GeneInfo* geneinfo;
+   //int flag;
+   GTData(GffObj* t=NULL) {
+       rna=t;
+       //flag=0;
+       locus=NULL;
+       replaced_by=NULL;
+       geneinfo=NULL;
+       if (rna!=NULL) {
+           geneinfo=(GeneInfo*)rna->uptr; //take over geneinfo, if there
+           rna->uptr=this;
+       }
+   }
    bool operator<(GTData& b) { return (rna < b.rna); }
    bool operator==(GTData& b) { return (rna==b.rna); }
 };
@@ -219,9 +237,9 @@ public:
            ((GTData*)(t->uptr))->locus=this;
            t_maxcov=t;
            strand=t->strand;
-           if (t->ftype_id==gff_fid_mRNA) {
+           //if (t->ftype_id==gff_fid_mRNA) {
+           if (t->isTranscript())
               is_mrna=true;
-           }
         }
     }
 
@@ -229,9 +247,9 @@ public:
         const char* gseqname=NULL;
         if (rnas.Count()>0) gseqname=rnas[0]->getGSeqName();
         else gseqname=gfs[0]->getGSeqName();
-        fprintf(f,"%s\t%s\tlocus\t%d\t%d\t.\t%c\t.\tID=%s;locus=%s",
+        fprintf(f,"%s\t%s\tlocus\t%d\t%d\t.\t%c\t.\tID=%s",
                    gseqname, loctrack.chars(), this->start, this->end, this->strand,
-                    locname.chars(), locname.chars());
+                    locname.chars());
         //const char* loc_gname=loc.getGeneName();
         if (this->gene_names.Count()>0) { //print all gene names associated to this locus
              fprintf(f, ";genes=%s",this->gene_names.First()->name.chars());
@@ -246,51 +264,56 @@ public:
              }
         }
         if (idxfirstvalid>=0) {
-            fprintf(f, ";transcripts=%s",this->rnas[idxfirstvalid]->getID());
-            for (int i=idxfirstvalid+1;i<this->rnas.Count();i++) {
-              fprintf(f, ",%s",this->rnas[i]->getID());
-            }
+        	GVec<int> tidx; //set of printable (non-discarded) rnas indexes
+        	for (int i=idxfirstvalid;i<this->rnas.Count();i++)
+        		if (((GTData*)this->rnas[i]->uptr)->replaced_by==NULL)
+        			tidx.Add(i);
+        	if (tidx.Count()>0) {
+               fprintf(f, ";transcripts=%s",this->rnas[tidx[0]]->getID());
+               for (int i=1;i<tidx.Count();i++)
+                 fprintf(f, ",%s",this->rnas[tidx[i]]->getID());
+        	}
         }
         fprintf(f, "\n");
     }
 
-    void addMerge(GffLocus& locus, GffObj* lnkrna) {
+   void addMerge(GffLocus& locus, GffObj* lnkrna) {
      //add all the elements of the other locus (merging)
      //-- merge mexons
      GArray<int> ovlexons(true,true); //list of locus.mexons indexes overlapping existing mexons
      int i=0; //index of first mexons with a merge
      int j=0; //index current mrna exon
      while (i<mexons.Count() && j<locus.mexons.Count()) {
-            uint istart=mexons[i].start;
-            uint iend=mexons[i].end;
-            uint jstart=locus.mexons[j].start;
-            uint jend=locus.mexons[j].end;
-            if (iend<jstart) { i++; continue; }
-            if (jend<istart) { j++; continue; }
-            ovlexons.Add(j);
-            //extend mexons[i] as needed
-            if (jstart<istart) mexons[i].start=jstart;
-            if (jend>iend) { //mexons[i] end extend
-                mexons[i].end=jend;
-                //now this could overlap the next mexon(s), so we have to merge them all
-                while (i<mexons.Count()-1 && mexons[i].end>mexons[i+1].start) {
-                    uint nextend=mexons[i+1].end;
-                    mexons.Delete(i+1);
-                    if (nextend>mexons[i].end) {
-                        mexons[i].end=nextend;
-                        break; //no need to check next mexons
-                    }
-                } //while next mexons merge
-            } // mexons[i] end extend
-            j++; //check the next locus.mexon
-        }
-        //-- add the rest of the non-overlapping mexons:
-        GSeg seg;
-        for (int i=0;i<locus.mexons.Count();i++) {
+    	 uint istart=mexons[i].start;
+    	 uint iend=mexons[i].end;
+    	 uint jstart=locus.mexons[j].start;
+    	 uint jend=locus.mexons[j].end;
+    	 if (iend<jstart) { i++; continue; }
+    	 if (jend<istart) { j++; continue; }
+    	 ovlexons.Add(j);
+    	 //extend mexons[i] as needed
+		 if (jstart<istart) mexons[i].start=jstart;
+		 if (jend>iend) { //mexons[i] end extend
+			 mexons[i].end=jend;
+			 //now this could overlap the next mexon(s), so we have to merge them all
+			 while (i<mexons.Count()-1 && mexons[i].end>mexons[i+1].start) {
+				 uint nextend=mexons[i+1].end;
+				 mexons.Delete(i+1);
+				 if (nextend>mexons[i].end) {
+					 mexons[i].end=nextend;
+					 break; //no need to check next mexons
+				 }
+			 } //while next mexons merge
+		 } // mexons[i] end extend
+		 j++; //check the next locus.mexon
+     }
+     //-- add the rest of the non-overlapping mexons:
+     GSeg seg;
+     for (int i=0;i<locus.mexons.Count();i++) {
             seg.start=locus.mexons[i].start;
             seg.end=locus.mexons[i].end;
             if (!ovlexons.Exists(i)) mexons.Add(seg);
-        }
+     }
      // -- add locus.rnas
      for (int i=0;i<locus.rnas.Count();i++) {
           ((GTData*)(locus.rnas[i]->uptr))->locus=this;
@@ -307,34 +330,26 @@ public:
      if (locus.is_mrna) is_mrna=true;
      if (t_maxcov->covlen<locus.t_maxcov->covlen)
             t_maxcov=locus.t_maxcov;
-     }
-
-    bool exonOverlap(GffLocus& loc) {
-        //check if any mexons overlap!
-        if (strand!=loc.strand || loc.start>end || start>loc.end) return false;
-        int i=0;
-        int j=0;
-        while (i<mexons.Count() && j<loc.mexons.Count()) {
-            uint istart=mexons[i].start;
-            uint iend=mexons[i].end;
-            uint jstart=loc.mexons[j].start;
-            uint jend=loc.mexons[j].end;
-            if (iend<jstart) { i++; continue; }
-            if (jend<istart) { j++; continue; }
-            //exon overlap found if we're here:
-            return true;
-        }
-        return false;
     }
 
-    bool add_gfobj(GffObj* t) {
+    bool add_gfobj(GffObj* t, bool adj) {
         //if (rnas.Count()==0) return true; //? should never be called on an empty locus
-        if (t->gseq_id!=gseq_id || t->strand!=strand || t->start>end || start>t->end)
+    	uint t_start=t->start;
+    	uint t_end=t->end;
+    	if (adj) {
+    		t_start--;
+    		t_end++;
+    	}
+        if (t->gseq_id!=gseq_id || /* t->strand!=strand || */ t_start>end || start>t_end)
               return false; //rna must be on the same genomic seq
         //check for exon overlap with existing mexons
         //also update mexons accordingly if t is to be added
         bool hasovl=false;
-        if (t->exons.Count()>0) {
+        if (t->exons.Count()>0) { //transcript-like entity
+        	if (adj) {
+        		t->exons.First()->start--;
+        		t->exons.Last()->end++;
+        	}
 			int i=0; //index of first mexons with a merge
 			int j=0; //index current t exon
 			GArray<int> ovlexons(true,true); //list of mrna exon indexes overlapping mexons
@@ -365,6 +380,10 @@ public:
 
 				j++; //check the next t exon
 			}//all vs all exon check loop
+        	if (adj) {
+        		t->exons.First()->start++;
+        		t->exons.Last()->end--;
+        	}
 	        if (hasovl) {
 	            GSeg seg;
 	             //add the rest of the non-overlapping exons
@@ -372,12 +391,12 @@ public:
 	                seg.start=t->exons[i]->start;
 	                seg.end=t->exons[i]->end;
 	                if (!ovlexons.Exists(i)) mexons.Add(seg);
-	                }
+	            }
 	            t_add(t);
 	            // add to rnas
 	            ((GTData*)t->uptr)->locus=this;
 	            gseq_id=t->gseq_id;
-	        }
+	       }
         } else {
         	//gene overlap check
 			uint jstart=t->start;
@@ -420,20 +439,23 @@ public:
       // adjust start/end
       //if (start==0 || start>t->start) start=t->start;
       if (start==0) start=t->start;
-        else if (start>t->start) {
+      else if (start>t->start) {
           start=t->start;
-          }
+      }
       if (end<t->end) end=t->end;
       if (t_maxcov->covlen<t->covlen) t_maxcov=t;
-      if (strand==0) strand=t->strand;
-      if (t->ftype_id==gff_fid_mRNA) is_mrna=true;
-      }
+      if (strand==0 || (strand=='.' && t->strand!='.')) strand=t->strand;
+      //if (t->ftype_id==gff_fid_mRNA) is_mrna=true;
+      if (t->isTranscript()) is_mrna=true;
+    }
 };
 
 class GenomicSeqData {
   int gseq_id;
  public:
   const char* gseq_name;
+  int seqreg_start; //if given by ##sequence-region comment
+  int seqreg_end;
   GList<GffObj> gfs; //all non-transcript features -> usually gene features
   GList<GffObj> rnas; //all transcripts on this genomic sequence
   GList<GffLocus> loci; //all loci clusters
@@ -442,13 +464,13 @@ class GenomicSeqData {
   uint64 r_bases;//base coverage on reverse strand
   uint64 u_bases;//base coverage on undetermined strand
   //GenomicSeqData(int gid=-1):rnas(true,true,false),loci(true,true,true),
-  GenomicSeqData(int gid=-1):gfs(true, true, false),rnas((GCompareProc*)gfo_cmpByLoc),loci(true,true,false),
-       tdata(false,true,false),  f_bases(0), r_bases(0), u_bases(0) {
-  gseq_id=gid;
+  GenomicSeqData(int gid=-1):gseq_id(gid), gseq_name(NULL), seqreg_start(0), seqreg_end(0),
+		  gfs(true, true, false),rnas((GCompareProc*)gfo_cmpByLoc),loci(true,true,false),
+		  tdata(false,true,false),  f_bases(0), r_bases(0), u_bases(0) {
   if (gseq_id>=0)
     gseq_name=GffObj::names->gseqs.getName(gseq_id);
-
   }
+
   bool operator==(GenomicSeqData& d){
     return gseq_id==d.gseq_id;
   }
@@ -458,6 +480,8 @@ class GenomicSeqData {
 };
 
 int gseqCmpName(const pointer p1, const pointer p2);
+
+GenomicSeqData* getGSeqData(GList<GenomicSeqData>& seqdata, int gseq_id);
 
 class GSpliceSite {
  public:
@@ -521,49 +545,91 @@ class GSpliceSite {
     }
 };
 
-struct GffLoader {
+class GffLoader {
+ public:
+  GVec<char*> headerLines; //for GFF3 we keep the first few header lines (not the sequence-region one)
   GStr fname;
   FILE* f;
-  bool transcriptsOnly;
-  bool gene2exon;
-  bool fullAttributes;
-  bool gatherExonAttrs;
-  bool mergeCloseExons;
-  bool showWarnings;
-  bool noPseudo;
-  bool BEDinput;
-  bool TLFinput;
-  bool placeGf(GffObj* t, GenomicSeqData* gdata, bool doCluster=true, bool collapseRedundant=true,
-                                    bool matchAllIntrons=true, bool fuzzSpan=false);
-  void load(GList<GenomicSeqData>&seqdata, GFValidateFunc* gf_validate=NULL,
-                      bool doCluster=true, bool doCollapseRedundant=true,
-                      bool matchAllIntrons=true, bool fuzzSpan=false, bool forceExons=false);
-  GffLoader(const char* filename):fname(filename) {
-      f=NULL;
+  GffNames* names;
+  union {
+	  unsigned int options;
+	  struct {
+		bool transcriptsOnly:1;
+		bool gene2exon:1;
+		bool fullAttributes:1;
+		bool keep_AllExonAttrs:1;
+		bool gatherExonAttrs:1;
+		bool mergeCloseExons:1;
+		bool ignoreLocus:1;
+		bool noPseudo:1;
+		bool BEDinput:1;
+		bool TLFinput:1;
+		bool keepGenes:1;
+		bool trAdoption:1; //orphan transcript adoption by the container gene
+		bool keepGff3Comments:1;
+		bool sortRefsAlpha:1;
+		bool doCluster:1;
+		bool collapseRedundant:1; //discard "redundant" transcripts (-M/--merge activated)
+		bool matchAllIntrons:1; //if true, contained transcripts are NOT discarded
+		bool fuzzSpan:1; //matching/contained redundancy relaxed to disregard full boundary containment
+		bool dOvlSET:1; //discard overlapping Single Exon Transcripts on any strand
+		bool forceExons:1;
+	  };
+  };
+
+  GffLoader():fname(),f(NULL), names(NULL), options(0) {
       transcriptsOnly=true;
-      gene2exon=false;
-      fullAttributes=false;
-      gatherExonAttrs=false;
-      mergeCloseExons=false;
-      showWarnings=false;
-      noPseudo=false;
-      BEDinput=false;
-      TLFinput=false;
+      gffnames_ref(GffObj::names);
+      names=GffObj::names;
+  }
+
+  void loadRefNames(GStr& flst);
+
+  void openFile(GStr& file_name) {
+	  //if (f!=NULL) closeFile();
+	  fname=file_name;
       if (fname=="-" || fname=="stdin") {
          f=stdin;
          fname="stdin";
-         }
-        else {
-          if ((f=fopen(fname.chars(), "r"))==NULL) {
-            GError("Error: cannot open gff file %s!\n",fname.chars());
-            }
-          }
       }
+      else {
+         if ((f=fopen(fname.chars(), "r"))==NULL) {
+           GError("Error: cannot open GFF file %s!\n",fname.chars());
+         }
+      }
+  }
+
+  void load(GList<GenomicSeqData>&seqdata, GFValidateFunc* gf_validate=NULL, GFFCommentParser* gf_parsecomment=NULL);
+
+  bool placeGf(GffObj* t, GenomicSeqData* gdata);
+
+  bool unsplContained(GffObj& ti, GffObj&  tj);
+  GffObj* redundantTranscripts(GffObj& ti, GffObj&  tj);
+
+
+  void terminate() {
+	  //if (f!=NULL) closeFile(); GffReader is going to close the file
+	  gffnames_unref(GffObj::names);
+	  names=NULL;
+  }
+  void clearHeaderLines() {
+	  if (headerLines.Count()>0) {
+		  for (int i=0;i<headerLines.Count();i++) {
+			  GFREE(headerLines[i]);
+			  headerLines[i]=NULL;
+		  }
+	  }
+  }
+  ~GffLoader() {
+	  this->terminate();
+	  clearHeaderLines();
+  }
+
 };
 
 void printFasta(FILE* f, GStr& defline, char* seq, int seqlen=-1, bool useStar=false);
 
-void printTabFormat(FILE* f, GffObj* t);
+//void printTabFormat(FILE* f, GffObj* t);
 
 //"position" a given coordinate x within a list of transcripts sorted by their start (lowest)
 //coordinate, using quick-search; the returned int is the list index of the closest *higher*
