@@ -111,8 +111,6 @@ Output options:\n\
  -m    <chr_replace> is a name mapping table for converting reference \n\
        sequence names, having this 2-column format:\n\
        <original_ref_ID> <new_ref_ID>\n\
-       WARNING: all GFF records on reference sequences whose original IDs\n\
-       are not found in the 1st column of this table will be discarded!\n\
  -t    use <trackname> in the 2nd column of each GFF/GTF output line\n\
  -o    write the records into <outfile> instead of stdout\n\
  -T    main output will be GTF instead of GFF3\n\
@@ -821,12 +819,13 @@ bool validateGffRec(GffObj* gffrec, GList<GffObj>* gfnew) {
 		if (rt) {
 			gffrec->setRefName(rt->new_name);
 		}
+		/* //no, do not discard non-matching entries, let them pass through!
 		else {
 			if (verbose)
 				GMessage("Info: %s discarded due to reference %s not being mapped\n",
 						gffrec->getID(), refname.chars());
 			return false; //discard, ref seq not in the given translation table
-		}
+		}*/
 	}
 	if (gffloader.transcriptsOnly && gffrec->isDiscarded()) {
 		//discard generic "locus" features with no other detailed subfeatures
