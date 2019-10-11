@@ -100,7 +100,9 @@ Output options:\n\
  -g   full path to a multi-fasta file with the genomic sequences\n\
       for all input mappings, OR a directory with single-fasta files\n\
       (one per genomic sequence, with file names matching sequence names)\n\
- -w    write a fasta file with spliced exons for each GFF transcript\n\
+ -w    write a fasta file with spliced exons for each transcript\n\
+ --w-add <N> for the -w option, extract additional <N> bases\n\
+       both upstream and downstream of the transcript boundaries\n\
  -x    write a fasta file with spliced CDS for each GFF transcript\n\
  -y    write a protein fasta file with the translation of CDS for each record\n\
  -W    for -w and -x options, write in the FASTA defline the exon\n\
@@ -182,9 +184,10 @@ class CTableField {
 FILE* ffasta=NULL;
 FILE* f_in=NULL;
 FILE* f_out=NULL;
-FILE* f_w=NULL; //fasta with spliced exons (transcripts)
-FILE* f_x=NULL; //fasta with spliced CDS
-FILE* f_y=NULL; //fasta with translated CDS
+FILE* f_w=NULL; //writing fasta with spliced exons (transcripts)
+int wPadding = 0; //padding for -w option
+FILE* f_x=NULL; //writing fasta with spliced CDS
+FILE* f_y=NULL; //wrting fasta with translated CDS
 
 bool wCDSonly=false;
 bool wNConly=false;
@@ -695,7 +698,21 @@ bool process_transcript(GFastaDb& gfasta, GffObj& gffrec) {
 	  uint cds_start=0;
 	  uint cds_end=0;
 	  seglst.Clear();
+	  //TODO: ? if wPadding is set, *temporarily* change first and last exon coordinates ?!?
+	  // or perhaps getSpliced() should take an additional padding parameter ?!?
+	  int padLeft=0;
+	  int padRight=0;
+	  if (wPadding>0) {
+		padLeft= (gffrec.start>(uint)wPadding) ? wPadding : gffrec.start - 1;
+		int ediff=faseq->getseqlen()-gffrec.end;
+	    padRight=(wPadding>ediff) ?  ediff : wPadding;
+   	    gffrec.addPadding(padLeft, padRight);
+	  }
 	  char* exont=gffrec.getSpliced(faseq, false, &seqlen, &cds_start, &cds_end, &seglst);
+	  //restore exons to normal (remove padding)
+	  if (wPadding>0)
+		  gffrec.removePadding(padLeft, padRight);
+
 	  GStr defline(gffrec.getID());
 	  if (exont!=NULL) {
 		  if (gffrec.CDstart>0) {
@@ -717,6 +734,13 @@ bool process_transcript(GFastaDb& gfasta, GffObj& gffrec) {
 				  defline.append("-");
 				  defline+=(int)gffrec.exons[i]->end;
 			  }
+			if (wPadding>0) {
+				defline.append(" padding:");
+				defline.append(padLeft);
+				defline+=(char)'|';
+				defline.append(padRight);
+			}
+
 			defline.append(" segs:");
 			for (int i=0;i<seglst.Count();i++) {
 				if (i>0) defline.append(",");
@@ -725,6 +749,7 @@ bool process_transcript(GFastaDb& gfasta, GffObj& gffrec) {
 				defline+=(int)seglst[i].end;
 				}
 		  }
+
 		  if (gffrec.attrs!=NULL) {
 			  //append all attributes found for each transcripts
 			  for (int i=0;i<gffrec.attrs->Count();i++) {
@@ -1005,7 +1030,7 @@ void printAsTable(FILE* f, GffObj* gfo, int* out_counter=NULL) {
 int main(int argc, char* argv[]) {
  GArgs args(argc, argv,
    "version;debug;merge;adj-stop;bed;in-bed;tlf;in-tlf;cluster-only;nc;cov-info;help;"
-    "sort-alpha;keep-genes;keep-comments;keep-exon-attrs;force-exons;t-adopt;gene2exon;"
+    "sort-alpha;keep-genes;w-add;keep-comments;keep-exon-attrs;force-exons;t-adopt;gene2exon;"
     "ignore-locus;no-pseudo;table=sort-by=hvOUNHPWCVJMKQYTDARSZFGLEBm:g:i:r:s:l:t:o:w:x:y:d:");
  args.printError(USAGE, true);
  if (args.getOpt('h') || args.getOpt("help")) {
@@ -1206,13 +1231,18 @@ int main(int argc, char* argv[]) {
  //if (f_out==NULL) f_out=stdout;
  if (gfasta.fastaPath==NULL && (validCDSonly || spliceCheck || args.getOpt('w')!=NULL || args.getOpt('x')!=NULL || args.getOpt('y')!=NULL))
   GError("Error: -g option is required for options -w, -x, -y, -V, -N, -M !\n");
-
  openfw(f_w, args, 'w');
  openfw(f_x, args, 'x');
  openfw(f_y, args, 'y');
+ s=args.getOpt("w-add");
+ if (!s.is_empty()) {
+	 if (f_w==NULL) GError("Error: --w-add option requires -w option!\n");
+	 wPadding=s.asInt();
+ }
 
  if (f_out==NULL && f_w==NULL && f_x==NULL && f_y==NULL && !covInfo)
 	 f_out=stdout;
+
  //if (f_y!=NULL || f_x!=NULL) wCDSonly=true;
  //useBadCDS=useBadCDS || (fgtfok==NULL && fgtfbad==NULL && f_y==NULL && f_x==NULL);
 
