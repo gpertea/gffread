@@ -1030,7 +1030,7 @@ void printAsTable(FILE* f, GffObj* gfo, int* out_counter=NULL) {
 int main(int argc, char* argv[]) {
  GArgs args(argc, argv,
    "version;debug;merge;adj-stop;bed;in-bed;tlf;in-tlf;cluster-only;nc;cov-info;help;"
-    "sort-alpha;keep-genes;w-add;keep-comments;keep-exon-attrs;force-exons;t-adopt;gene2exon;"
+    "sort-alpha;keep-genes;w-add=;keep-comments;keep-exon-attrs;force-exons;t-adopt;gene2exon;"
     "ignore-locus;no-pseudo;table=sort-by=hvOUNHPWCVJMKQYTDARSZFGLEBm:g:i:r:s:l:t:o:w:x:y:d:");
  args.printError(USAGE, true);
  if (args.getOpt('h') || args.getOpt("help")) {
