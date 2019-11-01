@@ -4,7 +4,7 @@
 #define __STDC_FORMAT_MACROS
 #include <inttypes.h>
 
-#define VERSION "0.11.5"
+#define VERSION "0.11.6"
 
 #define USAGE "gffread v" VERSION ". Usage:\n\
 gffread <input_gff> [-g <genomic_seqs_fasta> | <dir>][-s <seq_info.fsize>] \n\

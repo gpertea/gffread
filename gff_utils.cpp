@@ -734,7 +734,7 @@ void GffLoader::load(GList<GenomicSeqData>& seqdata, GFValidateFunc* gf_validate
 		GffNameList& attrnames = GffObj::names->attrs;//gffr->names->attrs;
 		for (int i=0;i<attrnames.Count();i++) {
 			char* n=attrnames[i]->name;
-			if (endsiWith(n, "_type")) {
+			if (endsiWith(n, "type")) {
 				pseudoTypeAttrIds.Add(attrnames[i]->idx);
 			}// else {
 			char* p=strifind(n, "pseudo");
@@ -783,7 +783,7 @@ void GffLoader::load(GList<GenomicSeqData>& seqdata, GFValidateFunc* gf_validate
 				if (verbose) warnPseudo(*m);
 				continue;
 			}
-			//  *_type=*_pseudogene
+			//  *type=*_pseudogene
             //find all attributes ending with _type and have value like: *_pseudogene
 			for (int i=0;i<pseudoTypeAttrIds.Count();++i) {
 				char* attrv=NULL;
