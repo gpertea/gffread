@@ -4,7 +4,7 @@
 #define __STDC_FORMAT_MACROS
 #include <inttypes.h>
 
-#define VERSION "0.11.6"
+#define VERSION "0.11.7"
 
 #define USAGE "gffread v" VERSION ". Usage:\n\
 gffread <input_gff> [-g <genomic_seqs_fasta> | <dir>][-s <seq_info.fsize>] \n\
@@ -126,7 +126,8 @@ Output options:\n\
  --table output a simple tab delimited format instead of GFF, with columns\n\
        having the values of GFF attributes given in <attrlist>; special\n\
        pseudo-attributes (prefixed by @) are recognized:\n\
-       @chr, @start, @end, @strand, @numexons, @exons, @cds, @covlen, @cdslen\n\
+       @id, @geneid, @chr, @start, @end, @strand, @numexons, @exons, \n\
+       @cds, @covlen, @cdslen\n\
  -v,-E expose (warn about) duplicate transcript IDs and other potential\n\
        problems with the given GFF/GTF records\n\
 "
@@ -159,7 +160,8 @@ class RefTran {
 
 enum ETableFieldType {
   ctfGFF_Attr=0, // attribute name as is
-  ctfGFF_ID, //ID or @id
+  ctfGFF_ID, //ID or @id or transcript_id
+  ctfGFF_geneID, //geneID or @gene_id
   ctfGFF_Parent, //Parent or @parent
   ctfGFF_chr, //@chr
   ctfGFF_feature, //@feature
@@ -293,6 +295,7 @@ void setTableFormat(GStr& s) {
 	 GHash<ETableFieldType> specialFields;
 	 specialFields.Add("chr", new ETableFieldType(ctfGFF_chr));
 	 specialFields.Add("id", new ETableFieldType(ctfGFF_ID));
+	 specialFields.Add("geneid", new ETableFieldType(ctfGFF_geneID));
 	 specialFields.Add("parent", new ETableFieldType(ctfGFF_Parent));
 	 specialFields.Add("feature", new ETableFieldType(ctfGFF_feature));
 	 specialFields.Add("start", new ETableFieldType(ctfGFF_start));
@@ -317,8 +320,13 @@ void setTableFormat(GStr& s) {
     	  else GMessage("Warning: table field '@%s' not recognized!\n",w.chars());
     	  continue;
       }
-      if (w=="ID") {
+      if (w=="ID" || w=="transcript_id") {
     	  CTableField tcol(ctfGFF_ID);
+    	  tableCols.Add(tcol);
+    	  continue;
+      }
+      if (w=="geneID" || w=="gene_id") {
+    	  CTableField tcol(ctfGFF_geneID);
     	  tableCols.Add(tcol);
     	  continue;
       }
@@ -950,6 +958,9 @@ void printGxfTab(FILE* f, GffObj& g) {
 			break;
 		case ctfGFF_ID:
 			fprintf(f,"%s",g.getID());
+			break;
+		case ctfGFF_geneID:
+			fprintf(f,"%s",g.getGeneID());
 			break;
 		case ctfGFF_Parent:
 			if (g.parent!=NULL) fprintf(f,"%s",g.parent->getID());
