@@ -627,7 +627,7 @@ class GffLoader {
 
 };
 
-void printFasta(FILE* f, GStr& defline, char* seq, int seqlen=-1, bool useStar=false);
+void printFasta(FILE* f, GStr* defline, char* seq, int seqlen=-1, bool useStar=false);
 
 //void printTabFormat(FILE* f, GffObj* t);
 

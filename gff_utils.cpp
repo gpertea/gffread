@@ -2,38 +2,12 @@
 
 bool verbose=false; //same with GffReader::showWarnings and GffLoader::beVserbose
 
-//bool debugState=false;
-/*
-void printTabFormat(FILE* f, GffObj* t) {
-	static char dbuf[1024];
-	fprintf(f, "%s\t%s\t%c\t%d\t%d\t%d\t", t->getID(), t->getGSeqName(), t->strand, t->start, t->end, t->exons.Count());
-	t->printExonList(f);
-	if (t->hasCDS()) fprintf(f, "\t%d:%d", t->CDstart, t->CDend);
-	 else fprintf(f, "\t.");
-
-	if (t->getGeneID()!=NULL)
-	    fprintf(f, "\tgeneID=%s",t->getGeneID());
-	if (t->getGeneName()!=NULL) {
-	    GffObj::decodeHexChars(dbuf, t->getGeneName());
-	    fprintf(f, "\tgene_name=%s", dbuf);
-	}
-	if (t->attrs!=NULL) {
-	    for (int i=0;i<t->attrs->Count();i++) {
-	       const char* attrname=t->getAttrName(i);
-	       GffObj::decodeHexChars(dbuf, t->attrs->Get(i)->attr_val);
-	       fprintf(f,"\t%s=%s", attrname, dbuf);
-	    }
-	}
-	fprintf(f, "\n");
-}
-*/
-
-void printFasta(FILE* f, GStr& defline, char* seq, int seqlen, bool useStar) {
+void printFasta(FILE* f, GStr* defline, char* seq, int seqlen, bool useStar) {
  if (seq==NULL) return;
  int len=(seqlen>0)?seqlen:strlen(seq);
  if (len<=0) return;
- if (!defline.is_empty())
-     fprintf(f, ">%s\n",defline.chars());
+ if (defline!=NULL)
+     fprintf(f, ">%s\n",defline->chars());
  int ilen=0;
  for (int i=0; i < len; i++, ilen++) {
    if (ilen == 70) {

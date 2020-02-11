@@ -4,7 +4,7 @@
 #define __STDC_FORMAT_MACROS
 #include <inttypes.h>
 
-#define VERSION "0.11.7"
+#define VERSION "0.11.8"
 
 #define USAGE "gffread v" VERSION ". Usage:\n\
 gffread <input_gff> [-g <genomic_seqs_fasta> | <dir>][-s <seq_info.fsize>] \n\
@@ -105,9 +105,8 @@ Output options:\n\
        both upstream and downstream of the transcript boundaries\n\
  -x    write a fasta file with spliced CDS for each GFF transcript\n\
  -y    write a protein fasta file with the translation of CDS for each record\n\
- -W    for -w and -x options, write in the FASTA defline the exon\n\
+ -W    for -w and -x options, write in the FASTA defline all the exon\n\
        coordinates projected onto the spliced sequence;\n\
-       for -y option, write transcript attributes in the FASTA defline\n\
  -S    for -y option, use '*' instead of '.' as stop codon translation\n\
  -L    Ensembl GTF to GFF3 conversion (implies -F; should be used with -m)\n\
  -m    <chr_replace> is a name mapping table for converting reference \n\
@@ -128,6 +127,9 @@ Output options:\n\
        pseudo-attributes (prefixed by @) are recognized:\n\
        @id, @geneid, @chr, @start, @end, @strand, @numexons, @exons, \n\
        @cds, @covlen, @cdslen\n\
+	   If any of -w/-y/-x FASTA output files are enabled, the same fields\n\
+	   (excluding @id) are appended to the definition line of corresponding\n\
+	   FASTA records\n\
  -v,-E expose (warn about) duplicate transcript IDs and other potential\n\
        problems with the given GFF/GTF records\n\
 "
@@ -312,6 +314,7 @@ void setTableFormat(GStr& s) {
 	 while (s.nextToken(w)) {
       if (w[0]=='@') {
     	  w=w.substr(1);
+    	  w.lower();
     	  ETableFieldType* v=specialFields.Find(w.chars());
     	  if (v!=NULL) {
     		  CTableField tcol(*v);
@@ -430,6 +433,85 @@ int adjust_stopcodon(GffObj& gffrec, int adj, GList<GSeg>* seglst=NULL) {
   if (seglst!=NULL) seglst->Last()->end+=realadj;
   return realadj;
  }
+
+void printTableData(FILE* f, GffObj& g, bool inFasta=false) {
+ //using attribute list in tableCols
+	char* av=NULL;
+	for(int i=0;i<tableCols.Count();i++) {
+		if (i>0 || inFasta) {
+     	   if (!inFasta || tableCols[i].type!=ctfGFF_ID)
+     		   fprintf(f,"\t");
+		}
+		switch(tableCols[i].type) {
+		case ctfGFF_Attr:
+			av=g.getAttr(tableCols[i].name.chars());
+			fprintf(f,"%s",av!=NULL? av : ".");
+			break;
+		case ctfGFF_chr:
+			fprintf(f,"%s",g.getGSeqName());
+			break;
+		case ctfGFF_ID:
+			if (!inFasta)
+			  fprintf(f,"%s",g.getID());
+			break;
+		case ctfGFF_geneID:
+			fprintf(f,"%s",g.getGeneID()!=NULL ? g.getGeneID() : ".");
+			break;
+		case ctfGFF_Parent:
+			fprintf(f,"%s",g.parent!=NULL ? g.parent->getID() : ".");
+			break;
+		case ctfGFF_feature:
+			fprintf(f,"%s",g.getFeatureName());
+			break;
+		case ctfGFF_start:
+			fprintf(f,"%d",g.start);
+			break;
+		case ctfGFF_end:
+			fprintf(f,"%d",g.end);
+			break;
+		case ctfGFF_strand:
+			fprintf(f,"%c",g.strand);
+			break;
+		case ctfGFF_numexons:
+			fprintf(f,"%d",g.exons.Count());
+			break;
+		case ctfGFF_exons:
+			if (g.exons.Count()>0) {
+				for (int x=0;x<g.exons.Count();x++) {
+					if (x>0) fprintf(f,",");
+					fprintf(f,"%d-%d",g.exons[x]->start, g.exons[x]->end);
+				}
+			} else fprintf(f,".");
+			break;
+		case ctfGFF_cds:
+			if (g.hasCDS()) {
+				GVec<GffExon> cds;
+				g.getCDSegs(cds);
+				for (int x=0;x<cds.Count();x++) {
+					if (x>0) fprintf(f,",");
+				    fprintf(f,"%d-%d",cds[x].start, cds[x].end);
+				}
+			}
+			else fprintf(f,".");
+			break;
+		case ctfGFF_covlen:
+			fprintf(f, "%d", g.covlen);
+			break;
+		case ctfGFF_cdslen:
+			if (g.hasCDS()) {
+				GVec<GffExon> cds;
+				g.getCDSegs(cds);
+				int clen=0;
+				for (int x=0;x<cds.Count();x++)
+				    clen+=cds[x].end-cds[x].start+1;
+				fprintf(f, "%d", clen);
+			}
+			else fprintf(f, "0");
+			break;
+		} //switch
+	}
+	fprintf(f,"\n");
+}
 
 bool process_transcript(GFastaDb& gfasta, GffObj& gffrec) {
  if (!gffrec.isTranscript()) return false; //shouldn't call this function unless it's a transcript
@@ -650,25 +732,16 @@ bool process_transcript(GFastaDb& gfasta, GffObj& gffrec) {
 			 if (cdsaa==NULL) { //translate now if not done before
 			   cdsaa=translateDNA(cdsnt, aalen, seqlen);
 			 }
-			 GStr defline(gffrec.getID());
-			 if (gffrec.attrs!=NULL) {
-				 //append all attributes found for each transcripts
-				for (int i=0;i<gffrec.attrs->Count();i++) {
-				  defline.append(" ");
-				  defline.append(gffrec.getAttrName(i));
-				  defline.append("=");
-				  char* s=gffrec.getAttrValue(i);
-				  if (s[0]=='"') defline.append(s);
-				  else defline.appendQuoted(s, '{', true);
-				}
-			 }
 			 if (aalen>0) {
 			   if (cdsaa[aalen-1]=='.' || cdsaa[aalen-1]=='\0') --aalen; //avoid printing the stop codon
-			   printFasta(f_y, defline, cdsaa, aalen, StarStop);
+ 			   fprintf(f_y, ">%s", gffrec.getID());
+ 			   if (fmtTable) printTableData(f_y, gffrec, true);
+ 			   else fprintf(f_y, "\n");
+			   printFasta(f_y, NULL, cdsaa, aalen, StarStop);
 			 }
 	  }
 	  if (f_x!=NULL) { //CDS only
-			 GStr defline(gffrec.getID());
+			 GStr defline(gffrec.getID(), 94);
 			 if (writeExonSegs) {
 				  defline.append(" loc:");
 				  defline.append(gffrec.getGSeqName());
@@ -685,19 +758,11 @@ bool process_transcript(GFastaDb& gfasta, GffObj& gffrec) {
 					  defline.append("-");
 					  defline+=(int)seglst[i].end;
 					  }
-				  }
-			 if (gffrec.attrs!=NULL) {
-				 //append all attributes found for each transcript
-				for (int i=0;i<gffrec.attrs->Count();i++) {
-					defline.append(" ");
-					defline.append(gffrec.getAttrName(i));
-					defline.append("=");
-					char* s=gffrec.getAttrValue(i);
-					if (s[0]=='"') defline.append(s);
-					else defline.appendQuoted(s, '{', true);
-				}
-			}
-			printFasta(f_x, defline, cdsnt, seqlen);
+			 }
+			 fprintf(f_x, ">%s", defline.chars());
+			 if (fmtTable) printTableData(f_x, gffrec, true);
+			 else fprintf(f_x, "\n");
+			 printFasta(f_x, NULL, cdsnt, seqlen);
 	  }
 	  GFREE(cdsnt);
 	  GFREE(cdsaa);
@@ -758,18 +823,10 @@ bool process_transcript(GFastaDb& gfasta, GffObj& gffrec) {
 				}
 		  }
 
-		  if (gffrec.attrs!=NULL) {
-			  //append all attributes found for each transcripts
-			  for (int i=0;i<gffrec.attrs->Count();i++) {
-				  defline.append(" ");
-				  defline.append(gffrec.getAttrName(i));
-				  defline.append("=");
-				  char* s=gffrec.getAttrValue(i);
-				  if (s[0]=='"') defline.append(s);
-				  else defline.appendQuoted(s, '{', true);
-			  }
-		  }
-		  printFasta(f_w, defline, exont, seqlen);
+		  fprintf(f_w, ">%s", defline.chars());
+		  if (fmtTable) printTableData(f_w, gffrec, true);
+		    else fprintf(f_w, "\n");
+		  printFasta(f_w, NULL, exont, seqlen);
 		  GFREE(exont);
 	  }
   } //writing f_w (spliced exons)
@@ -941,84 +998,6 @@ void printGffObj(FILE* f, GffObj* gfo, GStr& locname, GffPrintMode exonPrinting,
     t.printGxf(f, exonPrinting, tracklabel, NULL, decodeChars);
 }
 
-
-void printGxfTab(FILE* f, GffObj& g) {
- //using attribute list in tableCols
-	char* av=NULL;
-	for(int i=0;i<tableCols.Count();i++) {
-		if (i>0) fprintf(f,"\t");
-		switch(tableCols[i].type) {
-		case ctfGFF_Attr:
-			av=g.getAttr(tableCols[i].name.chars());
-			if (av!=NULL) fprintf(f,"%s",av);
-			else fprintf(f, ".");
-			break;
-		case ctfGFF_chr:
-			fprintf(f,"%s",g.getGSeqName());
-			break;
-		case ctfGFF_ID:
-			fprintf(f,"%s",g.getID());
-			break;
-		case ctfGFF_geneID:
-			fprintf(f,"%s",g.getGeneID());
-			break;
-		case ctfGFF_Parent:
-			if (g.parent!=NULL) fprintf(f,"%s",g.parent->getID());
-			else fprintf(f, ".");
-			break;
-		case ctfGFF_feature:
-			fprintf(f,"%s",g.getFeatureName());
-			break;
-		case ctfGFF_start:
-			fprintf(f,"%d",g.start);
-			break;
-		case ctfGFF_end:
-			fprintf(f,"%d",g.end);
-			break;
-		case ctfGFF_strand:
-			fprintf(f,"%c",g.strand);
-			break;
-		case ctfGFF_numexons:
-			fprintf(f,"%d",g.exons.Count());
-			break;
-		case ctfGFF_exons:
-			if (g.exons.Count()>0) {
-				for (int x=0;x<g.exons.Count();x++) {
-					if (x>0) fprintf(f,",");
-					fprintf(f,"%d-%d",g.exons[x]->start, g.exons[x]->end);
-				}
-			} else fprintf(f,".");
-			break;
-		case ctfGFF_cds:
-			if (g.hasCDS()) {
-				GVec<GffExon> cds;
-				g.getCDSegs(cds);
-				for (int x=0;x<cds.Count();x++) {
-					if (x>0) fprintf(f,",");
-				    fprintf(f,"%d-%d",cds[x].start, cds[x].end);
-				}
-			}
-			else fprintf(f,".");
-			break;
-		case ctfGFF_covlen:
-			fprintf(f, "%d", g.covlen);
-			break;
-		case ctfGFF_cdslen:
-			if (g.hasCDS()) {
-				GVec<GffExon> cds;
-				g.getCDSegs(cds);
-				int clen=0;
-				for (int x=0;x<cds.Count();x++)
-				    clen+=cds[x].end-cds[x].start+1;
-				fprintf(f, "%d", clen);
-			}
-			else fprintf(f, "0");
-			break;
-		}
-	}
-	fprintf(f,"\n");
-}
-
 void printAsTable(FILE* f, GffObj* gfo, int* out_counter=NULL) {
     GffObj& t=*gfo;
     GTData* tdata=(GTData*)(t.uptr);
@@ -1032,10 +1011,10 @@ void printAsTable(FILE* f, GffObj* gfo, int* out_counter=NULL) {
 			  pdata->geneinfo->finalize();
 		 //t.parent->addAttr("locus", locname.chars());
 		 //(*out_counter)++; ?
-		 printGxfTab(f, *t.parent);
+		 printTableData(f, *t.parent);
 		 T_NO_PRINT(t.parent->udata);
 	 }
-    printGxfTab(f, *gfo);
+    printTableData(f, *gfo);
 }
 
 int main(int argc, char* argv[]) {
@@ -1423,7 +1402,7 @@ int main(int argc, char* argv[]) {
                  if (firstGSeqHeader) { printGSeqHeader(f_out, gdata); firstGSeqHeader=false; }
                  gfst.printGxf(f_out, exonPrinting, tracklabel, NULL, decodeChars);
                }
-               else printGxfTab(f_out, gfst);
+               else printTableData(f_out, gfst);
              }
              ++gfs_i;
            }
@@ -1448,13 +1427,13 @@ int main(int argc, char* argv[]) {
 					 if (pdata && pdata->geneinfo!=NULL)
 						  pdata->geneinfo->finalize();
 					 if (fmtTable)
-						 printGxfTab(f_out, *(t.parent));
+						 printTableData(f_out, *(t.parent));
 					 else
 						 t.parent->printGxf(f_out, exonPrinting, tracklabel, NULL, decodeChars);
 					 T_NO_PRINT(t.parent->udata);
 				 }
 				 if (fmtTable)
-					 printGxfTab(f_out, t);
+					 printTableData(f_out, t);
 				 else
 					 t.printGxf(f_out, exonPrinting, tracklabel, NULL, decodeChars);
              }
@@ -1472,7 +1451,7 @@ int main(int argc, char* argv[]) {
               if (firstGSeqHeader) { printGSeqHeader(f_out, gdata); firstGSeqHeader=false; }
               gfst.printGxf(f_out, exonPrinting, tracklabel, NULL, decodeChars);
            } else
-              printGxfTab(f_out, gfst);
+              printTableData(f_out, gfst);
          }
          ++gfs_i;
       }
