@@ -127,9 +127,9 @@ Output options:\n\
        pseudo-attributes (prefixed by @) are recognized:\n\
        @id, @geneid, @chr, @start, @end, @strand, @numexons, @exons, \n\
        @cds, @covlen, @cdslen\n\
-	   If any of -w/-y/-x FASTA output files are enabled, the same fields\n\
-	   (excluding @id) are appended to the definition line of corresponding\n\
-	   FASTA records\n\
+       If any of -w/-y/-x FASTA output files are enabled, the same fields\n\
+       (excluding @id) are appended to the definition line of corresponding\n\
+       FASTA records\n\
  -v,-E expose (warn about) duplicate transcript IDs and other potential\n\
        problems with the given GFF/GTF records\n\
 "
