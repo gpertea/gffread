@@ -163,7 +163,8 @@ class RefTran {
 enum ETableFieldType {
   ctfGFF_Attr=0, // attribute name as is
   ctfGFF_ID, //ID or @id or transcript_id
-  ctfGFF_geneID, //geneID or @gene_id
+  ctfGFF_geneID, //geneID or @gene_id or @geneid
+  ctfGFF_geneName, //geneName or @gene_name or @genename
   ctfGFF_Parent, //Parent or @parent
   ctfGFF_chr, //@chr
   ctfGFF_feature, //@feature
@@ -298,6 +299,7 @@ void setTableFormat(GStr& s) {
 	 specialFields.Add("chr", new ETableFieldType(ctfGFF_chr));
 	 specialFields.Add("id", new ETableFieldType(ctfGFF_ID));
 	 specialFields.Add("geneid", new ETableFieldType(ctfGFF_geneID));
+	 specialFields.Add("genename", new ETableFieldType(ctfGFF_geneName));
 	 specialFields.Add("parent", new ETableFieldType(ctfGFF_Parent));
 	 specialFields.Add("feature", new ETableFieldType(ctfGFF_feature));
 	 specialFields.Add("start", new ETableFieldType(ctfGFF_start));
@@ -325,6 +327,11 @@ void setTableFormat(GStr& s) {
       }
       if (w=="ID" || w=="transcript_id") {
     	  CTableField tcol(ctfGFF_ID);
+    	  tableCols.Add(tcol);
+    	  continue;
+      }
+      if (w=="geneID" || w=="gene_id") {
+    	  CTableField tcol(ctfGFF_geneID);
     	  tableCols.Add(tcol);
     	  continue;
       }
@@ -456,6 +463,9 @@ void printTableData(FILE* f, GffObj& g, bool inFasta=false) {
 			break;
 		case ctfGFF_geneID:
 			fprintf(f,"%s",g.getGeneID()!=NULL ? g.getGeneID() : ".");
+			break;
+		case ctfGFF_geneName:
+			fprintf(f,"%s",g.getGeneName()!=NULL ? g.getGeneName() : ".");
 			break;
 		case ctfGFF_Parent:
 			fprintf(f,"%s",g.parent!=NULL ? g.parent->getID() : ".");
