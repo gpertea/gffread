@@ -75,8 +75,10 @@ OBJS := ${GCLDIR}/GBase.o ${GCLDIR}/GArgs.o ${GCLDIR}/GFaSeqGet.o \
  
 .PHONY : all
 
-nodebug: release
-all release debug memcheck memdebug profile gprof prof: gffread
+all release debug memcheck memdebug profile gprof prof: ../gclib gffread
+
+../gclib:
+	$(shell cd .. && git clone https://github.com/gpertea/gclib.git)
 
 $(OBJS) : $(GCLDIR)/GBase.h $(GCLDIR)/gff.h
 gffread.o : gff_utils.h $(GCLDIR)/GBase.h $(GCLDIR)/gff.h
