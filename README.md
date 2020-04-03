@@ -1,11 +1,12 @@
 # gffread
-GFF/GTF parsing utility providing format conversions, region filtering, 
-FASTA sequence extraction and more.
+GFF/GTF utility providing format conversions, filtering, FASTA sequence 
+extraction and more.
 
 Use gffread -h to check the usage options.
 
-Compiling this program from source requires the [GCLib](../../../gclib) code 
-library. Building the program can be done like this:
+# INSTALL
+Build this program from source requires the [GCLib](../../../gclib) code 
+library. 
 
 ```
   cd /some/build/dir
@@ -14,5 +15,6 @@ library. Building the program can be done like this:
   cd gffread
   make release
 ```
+
 
 This should build the **gffread** binary in the current directory.
