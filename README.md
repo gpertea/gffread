@@ -10,7 +10,6 @@ library.
 
 ```
   cd /some/build/dir
-  git clone https://github.com/gpertea/gclib
   git clone https://github.com/gpertea/gffread
   cd gffread
   make release
