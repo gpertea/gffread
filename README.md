@@ -1,5 +1,5 @@
 ## GffRead
-FF/GTF utility providing format conversions, filtering, FASTA sequence 
+GFF/GTF utility providing format conversions, filtering, FASTA sequence 
 extraction and more.
 
 Use gffread -h to check the usage options.
