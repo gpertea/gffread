@@ -2,7 +2,7 @@
 GFF/GTF utility providing format conversions, filtering, FASTA sequence 
 extraction and more.
 
-Use gffread -h to check the usage options.
+Use `gffread -h` to check the usage options.
 
 ## Installation
 Building this program from source requires the [GCLib](../../../gclib) code 
