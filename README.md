@@ -1,4 +1,5 @@
 ## GffRead 
+[![DOI](https://zenodo.org/badge/48200340.svg)](https://zenodo.org/badge/latestdoi/48200340)
 GFF/GTF utility providing format conversions, filtering, FASTA sequence 
 extraction and more.
 
@@ -16,4 +17,4 @@ library.
 ```
 This should create the **gffread** binary in the current directory.
 
-[![DOI](https://zenodo.org/badge/48200340.svg)](https://zenodo.org/badge/latestdoi/48200340)
+
