@@ -1,0 +1,17 @@
+NT_187562.1	StringTie	transcript	403	10275	.	+	.	transcript_id "STRG.1.1"; gene_id "STRG.1";
+NT_187562.1	StringTie	exon	403	495	.	+	.	transcript_id "STRG.1.1"; gene_id "STRG.1";
+NT_187562.1	StringTie	exon	1995	2726	.	+	.	transcript_id "STRG.1.1"; gene_id "STRG.1";
+NT_187562.1	StringTie	exon	9665	10275	.	+	.	transcript_id "STRG.1.1"; gene_id "STRG.1";
+NT_187562.1	StringTie	transcript	214032	219967	.	-	.	transcript_id "STRG.3.1"; gene_id "STRG.3";
+NT_187562.1	StringTie	exon	214032	214270	.	-	.	transcript_id "STRG.3.1"; gene_id "STRG.3";
+NT_187562.1	StringTie	exon	214372	214511	.	-	.	transcript_id "STRG.3.1"; gene_id "STRG.3";
+NT_187562.1	StringTie	exon	216955	217211	.	-	.	transcript_id "STRG.3.1"; gene_id "STRG.3";
+NT_187562.1	StringTie	exon	217435	217573	.	-	.	transcript_id "STRG.3.1"; gene_id "STRG.3";
+NT_187562.1	StringTie	exon	219568	219648	.	-	.	transcript_id "STRG.3.1"; gene_id "STRG.3";
+NT_187562.1	StringTie	exon	219891	219967	.	-	.	transcript_id "STRG.3.1"; gene_id "STRG.3";
+NT_187562.1	StringTie	transcript	230172	233179	.	-	.	transcript_id "STRG.4.2"; gene_id "STRG.4";
+NT_187562.1	StringTie	exon	230172	231784	.	-	.	transcript_id "STRG.4.2"; gene_id "STRG.4";
+NT_187562.1	StringTie	exon	233047	233179	.	-	.	transcript_id "STRG.4.2"; gene_id "STRG.4";
+NT_187562.1	BestRefSeq	transcript	962573	963937	.	+	.	transcript_id "STRG.6.2"; gene_id "STRG.6";
+NT_187562.1	BestRefSeq	exon	962573	962829	.	+	.	transcript_id "STRG.6.2"; gene_id "STRG.6";
+NT_187562.1	BestRefSeq	exon	963419	963937	.	+	.	transcript_id "STRG.6.2"; gene_id "STRG.6";
