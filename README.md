@@ -11,8 +11,8 @@ The official webpage and download packages for this utility can be found online 
 Use `gffread -h` to see the command line usage options.
 
 ## Installation
-Building this program from source requires the [GCLib](../../../gclib) code 
-library. 
+Building this program from source requires the [GCLib](../../../gclib) source code 
+library. The `make` command should automatically fetch the latest gclib version from the repository if no `../gclib` directory is found.
 
 ```
   cd /some/build/dir
