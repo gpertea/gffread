@@ -720,9 +720,7 @@ void GffLoader::load(GList<GenomicSeqData>& seqdata, GFValidateFunc* gf_validate
 		}
 	}
 
-	//int redundant=0; //redundant annotation discarded
 	if (verbose) GMessage("   .. loaded %d genomic features from %s\n", gffr->gflst.Count(), fname.chars());
-	//int rna_deleted=0;
 	//add to GenomicSeqData, adding to existing loci and identifying intron-chain duplicates
 	for (int k=0;k<gffr->gflst.Count();k++) {
 		GffObj* m=gffr->gflst[k];

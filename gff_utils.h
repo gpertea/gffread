@@ -26,7 +26,7 @@ typedef bool GFValidateFunc(GffObj* gf, GList<GffObj>* gfadd);
 //keep/set original/old strand
 #define T_SET_OSTRAND(d, s) d |= s
 
-class GeneInfo { //for Ensembl GTF conversion
+class GeneInfo {
  public:
    int flag;
    GffObj* gf;
@@ -59,6 +59,11 @@ class GeneInfo { //for Ensembl GTF conversion
      gfrec->incLevel();
      gfrec->parent=gf;
      gf->children.Add(gfrec);
+     const char* s=NULL;
+     if ((s=gfrec->getGeneName())) {
+    	 gf->addAttr("Name", s);
+    	 gf->copyAttrs(gfrec);
+     }
      if (ensembl_convert) {
        //gf->addAttr("type", gf->getTrackName());
        const char* biotype=gfrec->getAttr("type");

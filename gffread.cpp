@@ -4,7 +4,7 @@
 #define __STDC_FORMAT_MACROS
 #include <inttypes.h>
 
-#define VERSION "0.11.8"
+#define VERSION "0.11.9"
 
 #define USAGE "gffread v" VERSION ". Usage:\n\
 gffread <input_gff> [-g <genomic_seqs_fasta> | <dir>][-s <seq_info.fsize>] \n\
@@ -205,23 +205,14 @@ bool addCDSattrs=false;
 bool add_hasCDS=false;
 bool adjustStop=false; //automatic adjust the CDS stop coordinate
 bool covInfo=false; // --cov-info : only report genome coverage
-//bool transcriptsOnly=true;
-//bool keepGenes=false; //for transcriptsOnly
-
-//bool sortAlpha=false;
 GStr sortBy; //file name with chromosomes listed in the desired order
-//bool keepRefOrder=false; //sort within chromosomes, but follow the input chromosome order -- default!
 GStr tableFormat; //list of "attributes" to print in tab delimited format
-//bool NoPseudo=false;
 bool spliceCheck=false; //only known splice-sites
 bool decodeChars=false; //decode url-encoded chars in attrs (-D)
 bool StarStop=false; //use * instead of . for stop codon translation
 
 bool fullCDSonly=false; // starts with START, ends with STOP codon
-//bool fullattr=false; //-F
-//bool gatherExonAttrs=false; //-G
 
-//bool sortByLoc=false; // if the GFF output should be sorted by location
 bool ensembl_convert=false; //-L, assist in converting Ensembl GTF to GFF3
 bool BEDinput=false;
 bool TLFinput=false;
@@ -781,8 +772,6 @@ bool process_transcript(GFastaDb& gfasta, GffObj& gffrec) {
 	  uint cds_start=0;
 	  uint cds_end=0;
 	  seglst.Clear();
-	  //TODO: ? if wPadding is set, *temporarily* change first and last exon coordinates ?!?
-	  // or perhaps getSpliced() should take an additional padding parameter ?!?
 	  int padLeft=0;
 	  int padRight=0;
 	  if (wPadding>0) {
@@ -966,8 +955,10 @@ bool validateGffRec(GffObj* gffrec, GList<GffObj>* gfnew) {
 		return false;
 	}
 	if (wNConly && gffrec->hasCDS()) return false;
-	if (ensembl_convert && startsWith(gffrec->getID(), "ENS")) {
-		//keep track of chr|gene_id data -- coordinate range
+	bool trackGenes=(ensembl_convert && startsWith(gffrec->getID(), "ENS")) ||
+			(gffloader.keepGenes && (gffrec->parent==NULL || !gffrec->parent->isGene()));
+	if (trackGenes) {
+		//keep track of chr|gene_id data and coordinate range
 		char* geneid=gffrec->getGeneID();
 		if (geneid!=NULL) {
 			GeneInfo* ginfo=gene_ids.Find(geneid);
@@ -1438,8 +1429,9 @@ int main(int argc, char* argv[]) {
 						  pdata->geneinfo->finalize();
 					 if (fmtTable)
 						 printTableData(f_out, *(t.parent));
-					 else
+					 else { //GFF3 output
 						 t.parent->printGxf(f_out, exonPrinting, tracklabel, NULL, decodeChars);
+					 }
 					 T_NO_PRINT(t.parent->udata);
 				 }
 				 if (fmtTable)
