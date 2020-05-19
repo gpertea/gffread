@@ -1,6 +1,9 @@
 #include "gff_utils.h"
 
+GHash<GeneInfo> gene_ids;
+
 bool verbose=false; //same with GffReader::showWarnings and GffLoader::beVserbose
+bool ensembl_convert=false; //-L, assist in converting Ensembl GTF to GFF3
 
 void printFasta(FILE* f, GStr* defline, char* seq, int seqlen, bool useStar) {
  if (seq==NULL) return;
@@ -133,6 +136,16 @@ bool tMatch(GffObj& a, GffObj& b) {
   }
   return true;
 }
+
+GTData::GTData(GffObj* t, GenomicSeqData* gd):rna(t),gdata(gd), locus(NULL), replaced_by(NULL), geneinfo(NULL) {
+    if (rna!=NULL) {
+        //geneinfo=(GeneInfo*)rna->uptr; //take over geneinfo, if there
+        rna->uptr=this;
+    }
+    if (gdata!=NULL)
+ 	   gdata->tdata.Add(this);
+}
+
 
 
 bool GffLoader::unsplContained(GffObj& ti, GffObj&  tj) {
@@ -375,8 +388,7 @@ bool GffLoader::placeGf(GffObj* t, GenomicSeqData* gdata) {
   				g.children.Add(t);
   			keep=true;
   			if (tdata==NULL) {
-  		       tdata=new GTData(t); //additional transcript data
-  		       gdata->tdata.Add(tdata);
+  		       tdata=new GTData(t, gdata); //additional transcript data
   			}
   			t->parent=&g;
   			//disable printing of gene if transcriptsOnly and --keep-genes wasn't given
@@ -400,8 +412,8 @@ bool GffLoader::placeGf(GffObj* t, GenomicSeqData* gdata) {
   if (t->exons.Count()>0) { //treating this entry as a transcript
 	gdata->rnas.Add(t); //added it in sorted order
 	if (tdata==NULL) {
-	   tdata=new GTData(t); //additional transcript data
-	   gdata->tdata.Add(tdata);
+	   tdata=new GTData(t, gdata); //additional transcript data
+	   //gdata->tdata.Add(tdata);
 	}
 	keep=true;
   }
@@ -409,10 +421,9 @@ bool GffLoader::placeGf(GffObj* t, GenomicSeqData* gdata) {
     if (t->isGene() || !this->transcriptsOnly) {
 	   gdata->gfs.Add(t);
 	   keep=true;
-	   //GTData* tdata=new GTData(t); //additional transcript data
 	   if (tdata==NULL) {
-		   tdata=new GTData(t); //additional transcript data
-		   gdata->tdata.Add(tdata);
+		   tdata=new GTData(t, gdata); //additional transcript data
+		   //gdata->tdata.Add(tdata);
 	   }
 	   noexon_gfs=true; //gene-like record, no exons defined
 	   keep=true;
@@ -420,6 +431,27 @@ bool GffLoader::placeGf(GffObj* t, GenomicSeqData* gdata) {
        return false; //nothing to do with these non-transcript objects
     }
   }
+  //keeping track of genes in special cases
+	char* geneid=t->getGeneID();
+	bool trackGenes=!t->isGene() && ( (keepGenes && t->parent==NULL) ||
+			    (ensembl_convert && startsWith(t->getID(), "ENS") ) ) ;
+	if (trackGenes) {
+		GTData* tdata=(GTData*)(t->uptr);
+		//keep track of chr|gene_id data and coordinate range
+		if (geneid!=NULL) {
+			GeneInfo* ginfo=gene_ids.Find(geneid);
+			if (ginfo==NULL) {//first time seeing this gene ID
+				GeneInfo* geneinfo=new GeneInfo(t, tdata->gdata, ensembl_convert);
+				gene_ids.Add(geneid, geneinfo);
+				//if (gfnew!=NULL) //new gene features
+				//  gfnew->Add(geneinfo->gf);
+			}
+			else ginfo->update(t);
+		}
+	}
+
+
+
   if (!doCluster) return keep;
 
   if (!keep) return false;
@@ -779,7 +811,7 @@ void GffLoader::load(GList<GenomicSeqData>& seqdata, GFValidateFunc* gf_validate
 			m->subftype_id=gff_fid_exon;
 		}
 		//GList<GffObj> gfadd(false,false); -- for gf_validate()?
-		if (gf_validate!=NULL && !(*gf_validate)(m, NULL)) {
+		if (gf_validate!=NULL && !(*gf_validate)(m)) {
 			continue;
 		}
 		m->isUsed(true); //so the gffreader won't destroy it

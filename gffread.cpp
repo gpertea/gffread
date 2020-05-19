@@ -213,7 +213,6 @@ bool StarStop=false; //use * instead of . for stop codon translation
 
 bool fullCDSonly=false; // starts with START, ends with STOP codon
 
-bool ensembl_convert=false; //-L, assist in converting Ensembl GTF to GFF3
 bool BEDinput=false;
 bool TLFinput=false;
 
@@ -245,7 +244,6 @@ GList<GenomicSeqData> g_data(true,true,true); //list of GFF records by genomic s
 GHash<SeqInfo> seqinfo;
 GHash<int> isoCounter; //counts the valid isoforms
 GHash<RefTran> reftbl;
-GHash<GeneInfo> gene_ids;
   //min-max gene span associated to chr|gene_id (mostly for Ensembl conversion)
 
 bool debugMode=false;
@@ -895,7 +893,7 @@ void processGffComment(const char* cmline, GfList* gflst) {
  }
 }
 
-bool validateGffRec(GffObj* gffrec, GList<GffObj>* gfnew) {
+bool validateGffRec(GffObj* gffrec) {
 	if (reftbl.Count()>0) { //check if we need to reject by ref seq filter
 		GStr refname(gffrec->getRefName());
 		RefTran* rt=reftbl.Find(refname.chars());
@@ -955,22 +953,6 @@ bool validateGffRec(GffObj* gffrec, GList<GffObj>* gfnew) {
 		return false;
 	}
 	if (wNConly && gffrec->hasCDS()) return false;
-	bool trackGenes=(ensembl_convert && startsWith(gffrec->getID(), "ENS")) ||
-			(gffloader.keepGenes && (gffrec->parent==NULL || !gffrec->parent->isGene()));
-	if (trackGenes) {
-		//keep track of chr|gene_id data and coordinate range
-		char* geneid=gffrec->getGeneID();
-		if (geneid!=NULL) {
-			GeneInfo* ginfo=gene_ids.Find(geneid);
-			if (ginfo==NULL) {//first time seeing this gene ID
-				GeneInfo* geneinfo=new GeneInfo(gffrec, ensembl_convert);
-				gene_ids.Add(geneid, geneinfo);
-				if (gfnew!=NULL)
-					gfnew->Add(geneinfo->gf); //do we really need this?
-			}
-			else ginfo->update(gffrec);
-		}
-	}
 	return true;
 }
 
@@ -1424,9 +1406,9 @@ int main(int argc, char* argv[]) {
 				 }
 				 //for GFF3 && table output, print the parent first, if any
 				 if ((fmtGFF3 || fmtTable) && t.parent!=NULL && T_PRINTABLE(t.parent->udata)) {
-					 GTData* pdata=(GTData*)(t.parent->uptr);
-					 if (pdata && pdata->geneinfo!=NULL)
-						  pdata->geneinfo->finalize();
+					 //GTData* pdata=(GTData*)(t.parent->uptr);
+					 //if (pdata && pdata->geneinfo!=NULL)
+					 //  pdata->geneinfo->finalize();
 					 if (fmtTable)
 						 printTableData(f_out, *(t.parent));
 					 else { //GFF3 output

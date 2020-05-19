@@ -6,8 +6,11 @@
 
 extern bool verbose;
 extern bool debugMode;
+extern bool ensembl_convert;
 
-typedef bool GFValidateFunc(GffObj* gf, GList<GffObj>* gfadd);
+
+//typedef bool GFValidateFunc(GffObj* gf, GList<GffObj>* gfadd);
+typedef bool GFValidateFunc(GffObj* gf);
 
 //test if a transcript should be printed (and not printed yet)
 #define T_PRINTABLE(d) (((d) & 0x100)==0)
@@ -26,6 +29,22 @@ typedef bool GFValidateFunc(GffObj* gf, GList<GffObj>* gfadd);
 //keep/set original/old strand
 #define T_SET_OSTRAND(d, s) d |= s
 
+class GffLocus;
+class GenomicSeqData;
+class GeneInfo;
+
+class GTData { // transcript associated data
+ public:
+   GffObj* rna;
+   GenomicSeqData* gdata;
+   GffLocus* locus;
+   GffObj* replaced_by;
+   GeneInfo* geneinfo;
+   GTData(GffObj* t=NULL, GenomicSeqData* gd=NULL);
+   bool operator<(GTData& b) { return (rna < b.rna); }
+   bool operator==(GTData& b) { return (rna==b.rna); }
+};
+
 class GeneInfo {
  public:
    int flag;
@@ -36,17 +55,23 @@ class GeneInfo {
      gf=NULL;
      flag=0;
    }
-   GeneInfo(GffObj* gfrec, bool ensembl_convert=false):gene_names(true, true, true),
+
+   GeneInfo(GffObj* gfrec, GenomicSeqData* gdata, bool ensembl_convert=false):flag(0), gf(NULL), gene_names(true, true, true),
                     transcripts(true,true,true) {
-     flag=0;
      if (gfrec->getGeneName())
         gene_names.Add(new GStr(gfrec->getGeneName()));
      transcripts.Add(new GStr(gfrec->getID()));
-     create_gf(gfrec, ensembl_convert);
-     }
+     create_gf(gfrec, gdata ,ensembl_convert);
+   }
 
-   void create_gf(GffObj* gfrec, bool ensembl_convert) {
+   ~GeneInfo() {
+      delete gf;
+   }
+
+   void create_gf(GffObj* gfrec, GenomicSeqData* gdata, bool ensembl_convert) {
      gf=new GffObj(gfrec->getGeneID());
+     GTData* gfdata=new GTData(gf, gdata);
+     gfdata->geneinfo=this;
      gf->gseq_id=gfrec->gseq_id;
      gf->track_id=gfrec->track_id;
      gf->start=gfrec->start;
@@ -55,7 +80,7 @@ class GeneInfo {
      gf->setFeatureName("gene");
      gf->isGene(true);
      gf->isUsed(true);
-     gf->uptr=this;
+     //gf->uptr=gfdata; //for these new gene objects
      gfrec->incLevel();
      gfrec->parent=gf;
      gf->children.Add(gfrec);
@@ -69,19 +94,16 @@ class GeneInfo {
        const char* biotype=gfrec->getAttr("type");
        if (biotype) gf->addAttr("type", biotype);
        }
-     //gf->children.Add(gfrec);
-     }
-   //~GeneInfo() {
-   //  }
+       // gf->children.Add(gfrec);
+   }
+
    void update(GffObj* gfrec) {
      if (transcripts.AddedIfNew(new GStr(gfrec->getID()))<0)
        return;
      gene_names.AddedIfNew(new GStr(gfrec->getGeneName()));
      if (gf==NULL) {
         GError("GeneInfo::update() called on uninitialized gf!\n");
-        //create_gf(gfrec);
-        //return;
-        }
+     }
      gfrec->parent=gf;
      gf->children.Add(gfrec);
      gfrec->incLevel();
@@ -90,53 +112,49 @@ class GeneInfo {
      if (gf->end<gfrec->end)
            gf->end=gfrec->end;
      }
-    void finalize() {
+
+   void finalize() {
      //prepare attributes for printing
      //must be called right before printing
      if (gf==NULL || transcripts.Count()==0) return;
      if (gene_names.Count()>0) {
        gf->addAttr("Name", gene_names[0]->chars());
-       /*
-       GStr s(gene_names[0]->chars());
-       for (int i=1;i<gene_names.Count();i++) {
-          s.append(",");
-          s.append(gene_names[i]->chars());
-          }
-       gf->addAttr("genes", s.chars());
-       */
-       } //has gene names
-       GStr t(transcripts[0]->chars());
-       for (int i=1;i<transcripts.Count();i++) {
+     } //has gene names
+     GStr t(transcripts[0]->chars());
+     for (int i=1;i<transcripts.Count();i++) {
           t.append(",");
           t.append(transcripts[i]->chars());
-          }
-       gf->addAttr("transcripts", t.chars());
      }
-};
-
-
-class GffLocus;
-
-class GTData { //transcript associated data
- public:
-   GffObj* rna;
-   GffLocus* locus;
-   GffObj* replaced_by;
-   GeneInfo* geneinfo;
-   //int flag;
-   GTData(GffObj* t=NULL) {
-       rna=t;
-       //flag=0;
-       locus=NULL;
-       replaced_by=NULL;
-       geneinfo=NULL;
-       if (rna!=NULL) {
-           geneinfo=(GeneInfo*)rna->uptr; //take over geneinfo, if there
-           rna->uptr=this;
-       }
+     gf->addAttr("transcripts", t.chars());
    }
-   bool operator<(GTData& b) { return (rna < b.rna); }
-   bool operator==(GTData& b) { return (rna==b.rna); }
+};
+class GenomicSeqData {
+  int gseq_id;
+ public:
+  const char* gseq_name;
+  int seqreg_start; //if given by ##sequence-region comment
+  int seqreg_end;
+  GList<GffObj> gfs; //all non-transcript features -> usually gene features
+  GList<GffObj> rnas; //all transcripts on this genomic sequence
+  GList<GffLocus> loci; //all loci clusters
+  GList<GTData> tdata; //transcript data (uptr holder for all rnas loaded here)
+  uint64 f_bases;//base coverage on forward strand
+  uint64 r_bases;//base coverage on reverse strand
+  uint64 u_bases;//base coverage on undetermined strand
+  //GenomicSeqData(int gid=-1):rnas(true,true,false),loci(true,true,true),
+  GenomicSeqData(int gid=-1):gseq_id(gid), gseq_name(NULL), seqreg_start(0), seqreg_end(0),
+		  gfs(true, true, false),rnas((GCompareProc*)gfo_cmpByLoc),loci(true,true,false),
+		  tdata(false,true,false),  f_bases(0), r_bases(0), u_bases(0) {
+  if (gseq_id>=0)
+    gseq_name=GffObj::names->gseqs.getName(gseq_id);
+  }
+
+  bool operator==(GenomicSeqData& d){
+    return gseq_id==d.gseq_id;
+  }
+  bool operator<(GenomicSeqData& d){
+    return (gseq_id<d.gseq_id);
+  }
 };
 
 class CGeneSym {
@@ -455,34 +473,6 @@ public:
     }
 };
 
-class GenomicSeqData {
-  int gseq_id;
- public:
-  const char* gseq_name;
-  int seqreg_start; //if given by ##sequence-region comment
-  int seqreg_end;
-  GList<GffObj> gfs; //all non-transcript features -> usually gene features
-  GList<GffObj> rnas; //all transcripts on this genomic sequence
-  GList<GffLocus> loci; //all loci clusters
-  GList<GTData> tdata; //transcript data (uptr holder for all rnas loaded here)
-  uint64 f_bases;//base coverage on forward strand
-  uint64 r_bases;//base coverage on reverse strand
-  uint64 u_bases;//base coverage on undetermined strand
-  //GenomicSeqData(int gid=-1):rnas(true,true,false),loci(true,true,true),
-  GenomicSeqData(int gid=-1):gseq_id(gid), gseq_name(NULL), seqreg_start(0), seqreg_end(0),
-		  gfs(true, true, false),rnas((GCompareProc*)gfo_cmpByLoc),loci(true,true,false),
-		  tdata(false,true,false),  f_bases(0), r_bases(0), u_bases(0) {
-  if (gseq_id>=0)
-    gseq_name=GffObj::names->gseqs.getName(gseq_id);
-  }
-
-  bool operator==(GenomicSeqData& d){
-    return gseq_id==d.gseq_id;
-  }
-  bool operator<(GenomicSeqData& d){
-    return (gseq_id<d.gseq_id);
-  }
-};
 
 int gseqCmpName(const pointer p1, const pointer p2);
 
