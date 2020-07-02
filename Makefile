@@ -13,7 +13,7 @@ BASEFLAGS  := -Wall -Wextra ${SEARCHDIRS} -D_FILE_OFFSET_BITS=64 \
 -D_LARGEFILE_SOURCE -D_REENTRANT -fno-strict-aliasing \
  -std=c++0x -fno-exceptions -fno-rtti
 
-GCCV8 := $(shell expr `g++ -dumpversion | cut -f1 -d.` \>= 8)
+GCCV8 := $(shell expr `${CXX} -dumpversion | cut -f1 -d.` \>= 8)
 ifeq "$(GCCV8)" "1"
  BASEFLAGS += -Wno-class-memaccess
 endif
@@ -34,12 +34,12 @@ else
   ifneq (,$(filter %memcheck %memdebug, $(MAKECMDGOALS)))
      #use sanitizer in gcc 4.9+
      MEMCHECK_BUILD := 1
-     GCCVER49 := $(shell expr `g++ -dumpversion | cut -f1,2 -d.` \>= 4.9)
+     GCCVER49 := $(shell expr `${CXX} -dumpversion | cut -f1,2 -d.` \>= 4.9)
      ifeq "$(GCCVER49)" "0"
        $(error gcc version 4.9 or greater is required for this build target)
      endif
      CXXFLAGS += -fno-omit-frame-pointer -fsanitize=undefined -fsanitize=address
-     GCCVER5 := $(shell expr `g++ -dumpversion | cut -f1 -d.` \>= 5)
+     GCCVER5 := $(shell expr `${CXX} -dumpversion | cut -f1 -d.` \>= 5)
      ifeq "$(GCCVER5)" "1"
        CXXFLAGS += -fsanitize=bounds -fsanitize=float-divide-by-zero -fsanitize=vptr
        CXXFLAGS += -fsanitize=float-cast-overflow -fsanitize=object-size
