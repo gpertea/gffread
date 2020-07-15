@@ -3,7 +3,65 @@
 GHash<GeneInfo> gene_ids;
 
 bool verbose=false; //same with GffReader::showWarnings and GffLoader::beVserbose
+bool debugMode=false;
 bool ensembl_convert=false; //-L, assist in converting Ensembl GTF to GFF3
+
+FILE* ffasta=NULL;
+FILE* f_in=NULL;
+FILE* f_out=NULL;
+FILE* f_w=NULL; //writing fasta with spliced exons (transcripts)
+int wPadding = 0; //padding for -w option
+FILE* f_x=NULL; //writing fasta with spliced CDS
+FILE* f_y=NULL; //wrting fasta with translated CDS
+
+
+int maxintron=999000000;
+
+bool wCDSonly=false;
+bool wNConly=false;
+int minLen=0; //minimum transcript length
+bool validCDSonly=false; // translation with no in-frame STOP
+bool bothStrands=false; //for single-exon mRNA validation, check the other strand too
+bool altPhases=false; //if original phase fails translation validation,
+                     //try the other 2 phases until one makes it
+bool addCDSattrs=false;
+bool add_hasCDS=false;
+//bool streamIn=false; // --stream option
+bool adjustStop=false; //automatic adjust the CDS stop coordinate
+bool covInfo=false; // --cov-info : only report genome coverage
+GStr tableFormat; //list of "attributes" to print in tab delimited format
+bool spliceCheck=false; //only known splice-sites
+bool decodeChars=false; //decode url-encoded chars in attrs (-D)
+bool StarStop=false; //use * instead of . for stop codon translation
+bool fullCDSonly=false; // starts with START, ends with STOP codon
+
+bool multiExon=false;
+bool writeExonSegs=false;
+char* tracklabel=NULL;
+char* rfltGSeq=NULL;
+char rfltStrand=0;
+uint rfltStart=0;
+uint rfltEnd=MAX_UINT;
+bool rfltWithin=false; //check for full containment within given range
+bool addDescr=false;
+
+
+bool fmtGFF3=true; //default output: GFF3
+//other formats only make sense in transcriptOnly mode
+bool fmtGTF=false;
+bool fmtBED=false;
+bool fmtTLF=false;
+bool fmtTable=false;
+
+GffPrintMode exonPrinting=pgffAny;
+
+GFastaDb gfasta;
+
+GHash<SeqInfo> seqinfo;
+GVec<CTableField> tableCols;
+GHash<RefTran> reftbl;
+
+GHash<int> isoCounter; //counts the valid isoforms
 
 void printFasta(FILE* f, GStr* defline, char* seq, int seqlen, bool useStar) {
  if (seq==NULL) return;
@@ -136,6 +194,546 @@ bool tMatch(GffObj& a, GffObj& b) {
   }
   return true;
 }
+
+
+char* getSeqDescr(char* seqid) {
+ static char charbuf[128];
+ if (seqinfo.Count()==0) return NULL;
+ char* suf=rstrchr(seqid, '.');
+ if (suf!=NULL) *suf=0;
+ SeqInfo* seqd=seqinfo.Find(seqid);
+ if (suf!=NULL) *suf='.';
+ if (seqd!=NULL) {
+  GStr s(seqd->descr);
+  //cleanup some Uniref gunk
+  if (s[0]=='[') {
+    int r=s.index(']');
+    if (r>=0 && r<8 && isdigit(s[1]))
+       s.remove(0,r+1);
+    }
+  if (s.length()>80) {
+    int r=s.index(';');
+    if (r>5) s.cut(r);
+    }
+  if (s.length()>127) {
+   s.cut(127);
+   int r=s.rindex(' ');
+   if (r>0) s.cut(r);
+   }
+  strcpy(charbuf, s.chars());
+  return charbuf;
+  }
+ else return NULL;
+}
+
+char* getSeqName(char* seqid) {
+  static char charbuf[128];
+  char* suf=rstrchr(seqid, '.');
+  if (suf!=NULL) *suf=0;
+  strcpy(charbuf, seqid);
+  if (suf!=NULL) *suf='.';
+  return charbuf;
+}
+
+
+int adjust_stopcodon(GffObj& gffrec, int adj, GList<GSeg>* seglst) {
+  //adj>0, extend CDS to include a potential stop codon
+  //when CDS is expanded, the terminal exon might have to be adjusted too
+  int realadj=0;
+  if (gffrec.strand=='-') {
+       if ((int)gffrec.CDstart>adj) {
+           gffrec.CDstart-=adj;
+           realadj=adj;
+           if (gffrec.exons.First()->start>gffrec.CDstart) {
+                 gffrec.covlen+=gffrec.exons.First()->start - gffrec.CDstart;
+                 gffrec.exons.First()->start=gffrec.CDstart;
+                 gffrec.start=gffrec.CDstart;
+                 }
+             }
+          }
+        else { // forward strand
+         //expand beyond
+         realadj=adj;
+         gffrec.CDend+=adj;
+         if (adj<0) {//restore
+           if (gffrec.exons.Last()->end==gffrec.CDend-adj) {
+                        gffrec.exons.Last()->end+=adj;
+                        gffrec.end=gffrec.exons.Last()->end;
+                        gffrec.covlen+=adj;
+                        }
+         }
+         else if (gffrec.exons.Last()->end<gffrec.CDend) {
+             gffrec.covlen+=gffrec.CDend-gffrec.exons.Last()->end;
+             gffrec.exons.Last()->end=gffrec.CDend;
+             gffrec.end=gffrec.CDend;
+             }
+         }
+  if (seglst!=NULL) seglst->Last()->end+=realadj;
+  return realadj;
+ }
+
+void printTableData(FILE* f, GffObj& g, bool inFasta) {
+ //using attribute list in tableCols
+	char* av=NULL;
+	for(int i=0;i<tableCols.Count();i++) {
+		if (i>0 || inFasta) {
+     	   if (!inFasta || tableCols[i].type!=ctfGFF_ID)
+     		   fprintf(f,"\t");
+		}
+		switch(tableCols[i].type) {
+		case ctfGFF_Attr:
+			av=g.getAttr(tableCols[i].name.chars());
+			fprintf(f,"%s",av!=NULL? av : ".");
+			break;
+		case ctfGFF_chr:
+			fprintf(f,"%s",g.getGSeqName());
+			break;
+		case ctfGFF_ID:
+			if (!inFasta)
+			  fprintf(f,"%s",g.getID());
+			break;
+		case ctfGFF_geneID:
+			fprintf(f,"%s",g.getGeneID()!=NULL ? g.getGeneID() : ".");
+			break;
+		case ctfGFF_geneName:
+			fprintf(f,"%s",g.getGeneName()!=NULL ? g.getGeneName() : ".");
+			break;
+		case ctfGFF_Parent:
+			fprintf(f,"%s",g.parent!=NULL ? g.parent->getID() : ".");
+			break;
+		case ctfGFF_feature:
+			fprintf(f,"%s",g.getFeatureName());
+			break;
+		case ctfGFF_start:
+			fprintf(f,"%d",g.start);
+			break;
+		case ctfGFF_end:
+			fprintf(f,"%d",g.end);
+			break;
+		case ctfGFF_strand:
+			fprintf(f,"%c",g.strand);
+			break;
+		case ctfGFF_numexons:
+			fprintf(f,"%d",g.exons.Count());
+			break;
+		case ctfGFF_exons:
+			if (g.exons.Count()>0) {
+				for (int x=0;x<g.exons.Count();x++) {
+					if (x>0) fprintf(f,",");
+					fprintf(f,"%d-%d",g.exons[x]->start, g.exons[x]->end);
+				}
+			} else fprintf(f,".");
+			break;
+		case ctfGFF_cds:
+			if (g.hasCDS()) {
+				GVec<GffExon> cds;
+				g.getCDSegs(cds);
+				for (int x=0;x<cds.Count();x++) {
+					if (x>0) fprintf(f,",");
+				    fprintf(f,"%d-%d",cds[x].start, cds[x].end);
+				}
+			}
+			else fprintf(f,".");
+			break;
+		case ctfGFF_covlen:
+			fprintf(f, "%d", g.covlen);
+			break;
+		case ctfGFF_cdslen:
+			if (g.hasCDS()) {
+				GVec<GffExon> cds;
+				g.getCDSegs(cds);
+				int clen=0;
+				for (int x=0;x<cds.Count();x++)
+				    clen+=cds[x].end-cds[x].start+1;
+				fprintf(f, "%d", clen);
+			}
+			else fprintf(f, "0");
+			break;
+		} //switch
+	}
+	fprintf(f,"\n");
+}
+bool GffLoader::validateGffRec(GffObj* gffrec) {
+	if (reftbl.Count()>0) { //check if we need to reject by ref seq filter
+		GStr refname(gffrec->getRefName());
+		RefTran* rt=reftbl.Find(refname.chars());
+		if (rt==NULL && refname.length()>2 && refname[-2]=='.' && isdigit(refname[-1])) {
+			//try removing the version suffix
+			refname.cut(-2);
+			//GMessage("[DEBUG] Trying ref name '%s'...\n", refname.chars());
+			rt=reftbl.Find(refname.chars());
+		}
+		if (rt) {
+			gffrec->setRefName(rt->new_name);
+		}
+		/* //no, do not discard non-matching entries, let them pass through!
+		else {
+			if (verbose)
+				GMessage("Info: %s discarded due to reference %s not being mapped\n",
+						gffrec->getID(), refname.chars());
+			return false; //discard, ref seq not in the given translation table
+		}*/
+	}
+	if (transcriptsOnly && gffrec->isDiscarded()) {
+		//discard generic "locus" features with no other detailed subfeatures
+		//GMessage("Warning: discarding %s GFF generic gene/locus container %s\n",gffrec->getID());
+		return false;
+	}
+	if (minLen>0 && gffrec->covlen<minLen) {
+		if (verbose)
+			GMessage("Info: %s discarded due to minimum length threshold %d\n",
+					gffrec->getID(), minLen);
+    	return false;
+	}
+	if (rfltGSeq!=NULL) { //filter by gseqName
+		if (strcmp(gffrec->getGSeqName(),rfltGSeq)!=0) {
+			return false;
+		}
+	}
+	if (rfltStrand>0 && gffrec->strand !=rfltStrand) {
+		return false;
+	}
+	//check coordinates
+	if (rfltStart!=0 || rfltEnd!=MAX_UINT) {
+		if (rfltWithin) {
+			if (gffrec->start<rfltStart || gffrec->end>rfltEnd) {
+				return false; //not within query range
+			}
+		}
+		else {
+			if (gffrec->start>rfltEnd || gffrec->end<rfltStart) {
+				return false;
+			}
+		}
+	}
+	if (multiExon && gffrec->exons.Count()<=1) {
+		return false;
+	}
+	if (wCDSonly && gffrec->CDstart==0) {
+		return false;
+	}
+	if (wNConly && gffrec->hasCDS()) return false;
+	return true;
+}
+
+bool process_transcript(GFastaDb& gfasta, GffObj& gffrec) {
+ if (!gffrec.isTranscript()) return false; //shouldn't call this function unless it's a transcript
+ //returns true if the transcript passed the filter
+ char* gname=gffrec.getGeneName();
+ if (gname==NULL) gname=gffrec.getGeneID();
+ if (ensembl_convert && startsWith(gffrec.getID(), "ENS")) {
+      const char* biotype=gffrec.getAttr("gene_biotype");
+      if (biotype) {
+         gffrec.addAttr("type", biotype);
+         gffrec.removeAttr("gene_biotype");
+         }
+       else { //old Ensembl files lacking gene_biotype
+         gffrec.addAttr("type", gffrec.getTrackName());
+         }
+
+      //bool is_gene=false;
+      bool is_pseudo=false;
+      if (strcmp(biotype, "protein_coding")==0 || gffrec.hasCDS())
+                gffrec.setFeatureName("mRNA");
+       else {
+          if (strcmp(biotype, "processed_transcript")==0)
+              gffrec.setFeatureName("proc_RNA");
+            else {
+              //is_gene=endsWith(biotype, "gene");
+              is_pseudo=strifind(biotype, "pseudo");
+              if (is_pseudo) {
+                   gffrec.setFeatureName("pseudo_RNA");
+                   }
+                else if (endsWith(biotype, "RNA")) {
+                   gffrec.setFeatureName(biotype);
+                   } else gffrec.setFeatureName("misc_RNA");
+              }
+          }
+      }
+ if (gname && strcmp(gname, gffrec.getID())!=0) {
+   int* isonum=isoCounter.Find(gname);
+   if  (isonum==NULL) {
+       isonum=new int(1);
+       isoCounter.Add(gname,isonum);
+       }
+      else (*isonum)++;
+   //defline.appendfmt(" gene=%s", gname);
+   }
+  int seqlen=0;
+
+  const char* tlabel=tracklabel;
+  if (tlabel==NULL) tlabel=gffrec.getTrackName();
+  //defline.appendfmt(" track:%s",tlabel);
+  char* cdsnt = NULL;
+  char* cdsaa = NULL;
+  int aalen=0;
+  for (int i=1;i<gffrec.exons.Count();i++) {
+     int ilen=gffrec.exons[i]->start-gffrec.exons[i-1]->end-1;
+     if (verbose && ilen>4000000)
+            GMessage("Warning: very large intron (%d) for transcript %s\n",
+                           ilen, gffrec.getID());
+     if (ilen>maxintron) {
+         return false;
+     }
+  }
+  GMapSegments seglst(gffrec.strand);
+  GFaSeqGet* faseq=NULL;
+  if (f_x!=NULL || f_y!=NULL || f_w!=NULL || spliceCheck || validCDSonly || addCDSattrs) {
+	  faseq=fastaSeqGet(gfasta, gffrec.getGSeqName());
+      if (faseq==NULL)
+	    	GError("Error: no genomic sequence available (check -g option!).\n");
+  }
+  if (spliceCheck && gffrec.exons.Count()>1) {
+    //check introns for splice site consensi ( GT-AG, GC-AG or AT-AC )
+    int glen=gffrec.end-gffrec.start+1;
+    const char* gseq=faseq->subseq(gffrec.start, glen);
+    bool revcompl=(gffrec.strand=='-');
+    bool ssValid=true;
+    for (int e=1;e<gffrec.exons.Count();e++) {
+      const char* intron=gseq+gffrec.exons[e-1]->end+1-gffrec.start;
+      int intronlen=gffrec.exons[e]->start-gffrec.exons[e-1]->end-1;
+      GSpliceSite acceptorSite(intron,intronlen,true, revcompl);
+      GSpliceSite    donorSite(intron,intronlen, false, revcompl);
+      //GMessage("%c intron %d-%d : %s .. %s\n",
+      //           gffrec.strand, istart, iend, donorSite.nt, acceptorSite.nt);
+      if (acceptorSite=="AG") { // GT-AG or GC-AG
+         if (!donorSite.canonicalDonor()) {
+            ssValid=false;break;
+            }
+         }
+      else if (acceptorSite=="AC") { //AT-AC also accepted
+         if (donorSite!="AT") { ssValid=false; break; }
+         }
+      else { ssValid=false; break; }
+      }
+    if (!ssValid) {
+      if (verbose)
+         GMessage("Unrecognized splice sites found for '%s'\n",gffrec.getID());
+      return false; //don't print this one!
+    }
+  }
+  bool trprint=true;
+  bool inframeStop=false;
+  //int stopCodonAdjust=0;
+  int mCDphase=0;
+  bool fullCDS=false;
+  bool endStop=false;
+  bool stopAdjusted=false;
+  if (add_hasCDS && gffrec.hasCDS()) gffrec.addAttr("hasCDS", "true");
+  if (gffrec.CDphase=='1' || gffrec.CDphase=='2')
+      mCDphase = gffrec.CDphase-'0';
+  //CDS partialness only added when -y -x -V options are given
+  if (gffrec.hasCDS() && (f_y!=NULL || f_x!=NULL || validCDSonly || addCDSattrs)) {
+    int strandNum=0;
+    int phaseNum=0;
+  CDS_CHECK:
+    uint cds_olen=0;
+    cdsnt=gffrec.getSpliced(faseq, true, &seqlen, NULL, &cds_olen, &seglst, adjustStop);
+    //if adjustStop, seqlen has the CDS+3'UTR length, but cds_olen still has the original CDS length
+    if (cdsnt!=NULL && cdsnt[0]!='\0') { //has CDS
+         cdsaa=translateDNA(cdsnt, aalen, seqlen);
+         char* p=strchr(cdsaa,'.');
+         int cds_aalen=aalen;
+         if (adjustStop)
+        	 cds_aalen=cds_olen/3; //originally stated CDS length
+         endStop=false;
+         if (p!=NULL) { //stop codon found
+        	 if (p-cdsaa==cds_aalen-1) { //stop found as the stated last CDS codon
+                  *p='\0';//remove it
+                  endStop=true;
+                  if (adjustStop) {
+                	  seqlen=cds_aalen*3;
+                	  aalen=cds_aalen;
+                  }
+                  cds_aalen--;
+                  aalen--;
+                  //no need to adjust stop codon
+              }
+              else {//stop found in a different position than the last codon
+            	  if (p-cdsaa<cds_aalen-1 && !adjustStop) {
+            		  inframeStop=true;
+            	  }
+            	  if (adjustStop) {
+            		  *p='\0';
+            		  cds_aalen=p-cdsaa+1; //adjusted CDS length
+            		  seqlen=cds_aalen*3;
+            		  aalen=cds_aalen;
+            		  uint gc=seglst.gmap(seqlen);
+            		  if (gffrec.strand=='-') gffrec.CDstart=gc;
+            		  else gffrec.CDend=gc;
+            		  endStop=true;
+            		  stopAdjusted=true;
+            	  }
+              }
+         }//stop codon found
+         //if (trprint==false) { //failed CDS validity check
+         if (inframeStop) {
+           //in-frame stop codon found
+           if (altPhases && phaseNum<3) {
+              phaseNum++; //try a different phase
+              gffrec.CDphase = '0'+((mCDphase+phaseNum)%3);
+              GFREE(cdsaa);
+              goto CDS_CHECK;
+           }
+           if (gffrec.exons.Count()==1 && bothStrands) {
+              strandNum++;
+              phaseNum=0;
+              if (strandNum<2) {
+                 GFREE(cdsaa);
+                 gffrec.strand = (gffrec.strand=='-') ? '+':'-';
+                 goto CDS_CHECK; //repeat the CDS check for a different frame
+              }
+           }
+           if (verbose) GMessage("Warning: In-frame STOP found for '%s'\n",gffrec.getID());
+           if (addCDSattrs) gffrec.addAttr("InFrameStop", "true");
+         } //has in-frame STOP
+         if (stopAdjusted) {
+      	   if (addCDSattrs) gffrec.addAttr("CDStopAdjusted", "true");
+      	   inframeStop=false; //pretend it's OK now that we've adjusted it
+         }
+         if (!inframeStop) {
+			 bool hasStart=(cdsaa[0]=='M'); //for the regular eukaryotic translation table
+			 fullCDS=(endStop && hasStart);
+			 if (!fullCDS) {
+				 const char* partialness=NULL;
+				 if (hasStart) partialness="3";
+				 else {
+					partialness = endStop ? "5" : "5_3";
+				 }
+				 if (addCDSattrs) gffrec.addAttr("partialness", partialness);
+			 }
+         }
+         if (trprint && ((fullCDSonly && !fullCDS) || (validCDSonly && inframeStop)) )
+        	 trprint=false;
+         //} // Valid CDS only requested?
+      } //has CDS
+  } //translation or codon check was requested
+  if (!trprint) {
+    GFREE(cdsnt);
+    GFREE(cdsaa);
+    //if (adjstop!=NULL) delete adjstop;
+    return false;
+  }
+  /*
+  if (validCDSonly) {
+     int stopCodonAdjust=adjstop->restore();
+     if (stopCodonAdjust!=0 && !endStop) {
+        //restore stop codon location
+        //adjust_stopcodon(gffrec, -stopCodonAdjust, &seglst);
+	    if (seglst.Count()>0) seglst.Last()->end-=stopCodonAdjust;
+        if (cdsnt!=NULL && seqlen>0) {
+           seqlen-=stopCodonAdjust;
+           cdsnt[seqlen]=0;
+        }
+        if (cdsaa!=NULL) aalen--;
+     }
+  }
+  if (adjstop!=NULL) delete adjstop;
+  */
+  if (cdsnt!=NULL) { // && !inframeStop) {
+	  if (f_y!=NULL) { //CDS translation fasta output requested
+			 if (cdsaa==NULL) { //translate now if not done before
+			   cdsaa=translateDNA(cdsnt, aalen, seqlen);
+			 }
+			 if (aalen>0) {
+			   if (cdsaa[aalen-1]=='.' || cdsaa[aalen-1]=='\0') --aalen; //avoid printing the stop codon
+ 			   fprintf(f_y, ">%s", gffrec.getID());
+ 			   if (fmtTable) printTableData(f_y, gffrec, true);
+ 			   else fprintf(f_y, "\n");
+			   printFasta(f_y, NULL, cdsaa, aalen, StarStop);
+			 }
+	  }
+	  if (f_x!=NULL) { //CDS only
+			 GStr defline(gffrec.getID(), 94);
+			 if (writeExonSegs) {
+				  defline.append(" loc:");
+				  defline.append(gffrec.getGSeqName());
+				  defline.appendfmt("(%c)",gffrec.strand);
+				  //warning: not CDS coordinates are written here, but the exon ones
+				  defline+=(int)gffrec.start;
+				  defline+=(char)'-';
+				  defline+=(int)gffrec.end;
+				  // -- here these are CDS substring coordinates on the spliced sequence:
+				  defline.append(" segs:");
+				  for (int i=0;i<seglst.Count();i++) {
+					  if (i>0) defline.append(",");
+					  defline+=(int)seglst[i].start;
+					  defline.append("-");
+					  defline+=(int)seglst[i].end;
+					  }
+			 }
+			 fprintf(f_x, ">%s", defline.chars());
+			 if (fmtTable) printTableData(f_x, gffrec, true);
+			 else fprintf(f_x, "\n");
+			 printFasta(f_x, NULL, cdsnt, seqlen);
+	  }
+	  GFREE(cdsnt);
+	  GFREE(cdsaa);
+  } //writing CDS or its translation
+  if (f_w!=NULL) { //write spliced exons
+	  uint cds_start=0;
+	  uint cds_end=0;
+	  seglst.Clear();
+	  int padLeft=0;
+	  int padRight=0;
+	  if (wPadding>0) {
+		padLeft= (gffrec.start>(uint)wPadding) ? wPadding : gffrec.start - 1;
+		int ediff=faseq->getseqlen()-gffrec.end;
+	    padRight=(wPadding>ediff) ?  ediff : wPadding;
+   	    gffrec.addPadding(padLeft, padRight);
+	  }
+	  char* exont=gffrec.getSpliced(faseq, false, &seqlen, &cds_start, &cds_end, &seglst);
+	  //restore exons to normal (remove padding)
+	  if (wPadding>0)
+		  gffrec.removePadding(padLeft, padRight);
+
+	  GStr defline(gffrec.getID());
+	  if (exont!=NULL) {
+		  if (gffrec.CDstart>0) {
+			  defline.appendfmt(" CDS=%d-%d", cds_start, cds_end);
+		  }
+		  if (writeExonSegs) {
+			  defline.append(" loc:");
+			  defline.append(gffrec.getGSeqName());
+			  defline+=(char)'|';
+			  defline+=(int)gffrec.start;
+			  defline+=(char)'-';
+			  defline+=(int)gffrec.end;
+			  defline+=(char)'|';
+			  defline+=(char)gffrec.strand;
+			  defline.append(" exons:");
+			  for (int i=0;i<gffrec.exons.Count();i++) {
+				  if (i>0) defline.append(",");
+				  defline+=(int)gffrec.exons[i]->start;
+				  defline.append("-");
+				  defline+=(int)gffrec.exons[i]->end;
+			  }
+			if (wPadding>0) {
+				defline.append(" padding:");
+				defline.append(padLeft);
+				defline+=(char)'|';
+				defline.append(padRight);
+			}
+
+			defline.append(" segs:");
+			for (int i=0;i<seglst.Count();i++) {
+				if (i>0) defline.append(",");
+				defline+=(int)seglst[i].start;
+				defline.append("-");
+				defline+=(int)seglst[i].end;
+				}
+		  }
+
+		  fprintf(f_w, ">%s", defline.chars());
+		  if (fmtTable) printTableData(f_w, gffrec, true);
+		    else fprintf(f_w, "\n");
+		  printFasta(f_w, NULL, exont, seqlen);
+		  GFREE(exont);
+	  }
+  } //writing f_w (spliced exons)
+  return true;
+}
+
 
 GTData::GTData(GffObj* t, GenomicSeqData* gd):rna(t),gdata(gd), locus(NULL), replaced_by(NULL), geneinfo(NULL) {
     if (rna!=NULL) {
@@ -709,7 +1307,7 @@ void warnPseudo(GffObj& m) {
 	GMessage("Info: pseudo gene/transcript record with ID=%s discarded.\n",m.getID());
 }
 
-void GffLoader::load(GList<GenomicSeqData>& seqdata, GFValidateFunc* gf_validate, GFFCommentParser* gf_parsecomment) {
+void GffLoader::load(GList<GenomicSeqData>& seqdata, GFFCommentParser* gf_parsecomment) {
 	if (f==NULL) GError("Error: GffLoader::load() cannot be called before ::openFile()!\n");
 	GffReader* gffr=new GffReader(f, this->transcriptsOnly, true); //not only mRNA features, sorted
 	clearHeaderLines();
@@ -724,6 +1322,30 @@ void GffLoader::load(GList<GenomicSeqData>& seqdata, GFValidateFunc* gf_validate
 	gffr->setIgnoreLocus(ignoreLocus);
 	gffr->setRefAlphaSorted(this->sortRefsAlpha);
 	if (keepGff3Comments && gf_parsecomment!=NULL) gffr->setCommentParser(gf_parsecomment);
+    int outcounter=0;
+	if (streamIn) { //this will ignore any clustering options
+		GffObj* t=NULL;
+		while ((t=gffr->readNext())!=NULL) {
+			if (!validateGffRec(t)) {
+				delete t;
+				continue;
+			}
+			if (process_transcript(gfasta, *t)) {
+				outcounter++;
+				if (f_out) {
+				  if (fmtTable)
+						printTableData(f_out, *t);
+				  else //GFF3, GTF, BED, TLF
+					t->printGxf(f_out, exonPrinting, tracklabel, NULL, decodeChars);
+				}
+			}
+			delete t;
+		}
+		delete gffr;
+		return;
+	}
+
+
 	gffr->readAll();
 	GVec<int> pseudoFeatureIds; //feature type: pseudo*
 	GVec<int> pseudoAttrIds;  // attribute: [is]pseudo*=true/yes/1
@@ -811,7 +1433,7 @@ void GffLoader::load(GList<GenomicSeqData>& seqdata, GFValidateFunc* gf_validate
 			m->subftype_id=gff_fid_exon;
 		}
 		//GList<GffObj> gfadd(false,false); -- for gf_validate()?
-		if (gf_validate!=NULL && !(*gf_validate)(m)) {
+		if (!validateGffRec(m)) {
 			continue;
 		}
 		m->isUsed(true); //so the gffreader won't destroy it

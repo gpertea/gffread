@@ -2,12 +2,61 @@
 #define GFF_UTILS_H
 #include "gff.h"
 #include "GStr.h"
+#include "GVec.hh"
 #include "GFaSeqGet.h"
 
 extern bool verbose;
 extern bool debugMode;
 extern bool ensembl_convert;
 
+extern FILE* ffasta;
+extern FILE* f_in;
+extern FILE* f_out;
+extern FILE* f_w; //writing fasta with spliced exons (transcripts)
+extern int wPadding; //padding for -w option
+extern FILE* f_x; //writing fasta with spliced CDS
+extern FILE* f_y; //wrting fasta with translated CDS
+
+extern int maxintron;
+
+extern bool wCDSonly;
+extern bool wNConly;
+extern int minLen; //minimum transcript length
+extern bool validCDSonly; // translation with no in-frame STOP
+extern bool bothStrands; //for single-exon mRNA validation, check the other strand too
+extern bool altPhases; //if original phase fails translation validation,
+                     //try the other 2 phases until one makes it
+extern bool addCDSattrs;
+extern bool add_hasCDS;
+
+extern bool adjustStop; //automatic adjust the CDS stop coordinate
+extern bool covInfo; // --cov-info : only report genome coverage
+extern GStr tableFormat; //list of "attributes" to print in tab delimited format
+extern bool spliceCheck; //only known splice-sites
+extern bool decodeChars; //decode url-encoded chars in attrs (-D)
+extern bool StarStop; //use * instead of . for stop codon translation
+extern bool fullCDSonly; // starts with START, ends with STOP codon
+
+extern bool multiExon;
+extern bool writeExonSegs;
+extern char* tracklabel;
+extern char* rfltGSeq;
+extern char rfltStrand;
+extern uint rfltStart;
+extern uint rfltEnd;
+extern bool rfltWithin; //check for full containment within given range
+extern bool addDescr;
+
+
+extern bool fmtGFF3; //output: GFF3
+//other formats only make sense in transcriptOnly mode
+extern bool fmtGTF;
+extern bool fmtBED;
+extern bool fmtTLF;
+extern bool fmtTable;
+
+
+extern GffPrintMode exonPrinting;
 
 //typedef bool GFValidateFunc(GffObj* gf, GList<GffObj>* gfadd);
 typedef bool GFValidateFunc(GffObj* gf);
@@ -28,6 +77,73 @@ typedef bool GFValidateFunc(GffObj* gf);
 #define T_OSTRAND(d) (d & 0xFF)
 //keep/set original/old strand
 #define T_SET_OSTRAND(d, s) d |= s
+
+class SeqInfo { //populated from the -s option of gffread
+ public:
+  int len;
+  char* descr;
+  SeqInfo( int l, char* s): len(l), descr(NULL) {
+    if (s!=NULL)
+      descr=Gstrdup(s);
+  }
+  ~SeqInfo() {
+    GFREE(descr);
+  }
+};
+
+class RefTran {
+ public:
+   char* new_name;
+   RefTran(char *ns) {
+      new_name=NULL;
+      if (ns!=NULL)
+         new_name=Gstrdup(ns);
+      }
+   ~RefTran() {
+      GFREE(new_name);
+      }
+};
+
+extern GFastaDb gfasta;
+extern GHash<SeqInfo> seqinfo;
+extern GHash<int> isoCounter; //counts the valid isoforms
+extern GHash<RefTran> reftbl;
+
+char* getSeqDescr(char* seqid);
+char* getSeqName(char* seqid);
+int adjust_stopcodon(GffObj& gffrec, int adj, GList<GSeg>* seglst=NULL);
+void printTableData(FILE* f, GffObj& g, bool inFasta=false);
+bool validateGffRec(GffObj* gffrec);
+bool process_transcript(GFastaDb& gfasta, GffObj& gffrec);
+
+enum ETableFieldType {
+  ctfGFF_Attr=0, // attribute name as is
+  ctfGFF_ID, //ID or @id or transcript_id
+  ctfGFF_geneID, //geneID or @gene_id or @geneid
+  ctfGFF_geneName, //geneName or @gene_name or @genename
+  ctfGFF_Parent, //Parent or @parent
+  ctfGFF_chr, //@chr
+  ctfGFF_feature, //@feature
+  ctfGFF_start, //@start
+  ctfGFF_end, //@end
+  ctfGFF_strand, //@strand
+  ctfGFF_numexons, //@numexons
+  ctfGFF_exons, //@exons
+  ctfGFF_cds, //@cds
+  ctfGFF_covlen, //@covlen
+  ctfGFF_cdslen//@cdslen
+};
+
+class CTableField {
+ public:
+   ETableFieldType type;
+   GStr name; //only for type ctfGFF_Attr
+   CTableField(ETableFieldType atype=ctfGFF_Attr):type(atype) { }
+   CTableField(GStr& attrname):type(ctfGFF_Attr),name(attrname) { }
+};
+
+
+extern GVec<CTableField> tableCols; //table output format fields
 
 class GffLocus;
 class GenomicSeqData;
@@ -569,6 +685,7 @@ class GffLoader {
 		bool fuzzSpan:1; //matching/contained redundancy relaxed to disregard full boundary containment
 		bool dOvlSET:1; //discard overlapping Single Exon Transcripts on any strand
 		bool forceExons:1;
+		bool streamIn:1;
 	  };
   };
 
@@ -594,7 +711,9 @@ class GffLoader {
       }
   }
 
-  void load(GList<GenomicSeqData>&seqdata, GFValidateFunc* gf_validate=NULL, GFFCommentParser* gf_parsecomment=NULL);
+  bool validateGffRec(GffObj* gffrec);
+
+  void load(GList<GenomicSeqData>&seqdata, GFFCommentParser* gf_parsecomment=NULL);
 
   bool placeGf(GffObj* t, GenomicSeqData* gdata);
 
