@@ -487,6 +487,11 @@ bool process_transcript(GFastaDb& gfasta, GffObj& gffrec) {
     //check introns for splice site consensi ( GT-AG, GC-AG or AT-AC )
     int glen=gffrec.end-gffrec.start+1;
     const char* gseq=faseq->subseq(gffrec.start, glen);
+    if (gseq==NULL) {
+    	GMessage("Error at GFF ID %s : could not retrieve subsequence %s:%d-%d !\n",
+    			  gffrec.getID(), gffrec.getRefName(), gffrec.start, gffrec.end);
+    	return false;
+    }
     bool revcompl=(gffrec.strand=='-');
     bool ssValid=true;
     for (int e=1;e<gffrec.exons.Count();e++) {
