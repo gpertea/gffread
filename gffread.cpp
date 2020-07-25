@@ -322,10 +322,9 @@ void printGff3Header(FILE* f, GArgs& args) {
 		fprintf(f, "%s\n", gffloader.headerLines[i]);
 	}
   } else {
-    fprintf(f, "# ");
-    args.printCmdLine(f);
-    fprintf(f, "# gffread v" VERSION "\n");
     fprintf(f, "##gff-version 3\n");
+    fprintf(f, "# gffread v" VERSION "\n");
+    fprintf(f, "# ");args.printCmdLine(f);
   }
 }
 
@@ -648,7 +647,7 @@ int main(int argc, char* argv[]) {
  int out_counter=0; //number of records printed
 
  if (fmtGTF)
-	 exonPrinting = pgtfAny;
+	 exonPrinting = gffloader.forceExons ? pgtfBoth : pgtfAny;
  else if (fmtBED)
 	 exonPrinting=pgffBED;
  else if (fmtTLF)
