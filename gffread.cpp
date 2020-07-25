@@ -10,7 +10,7 @@
 gffread <input_gff> [-g <genomic_seqs_fasta> | <dir>][-s <seq_info.fsize>] \n\
  [-o <outfile>] [-t <trackname>] [-r [[<strand>]<chr>:]<start>..<end> [-R]]\n\
  [-CTVNJMKQAFPGUBHZWTOLE] [-w <exons.fa>] [-x <cds.fa>] [-y <tr_cds.fa>]\n\
- [-i <maxintron>] [--bed] [--table <attrlist>] [--sort-by <refseq_list.txt>]\n\
+ [-i <maxintron>] [--stream] [--bed] [--table <attrlist>] [--sort-by <ref.lst>]\n\
  \n\
  Filter, convert or cluster GFF/GTF/BED records, extract the sequence of\n\
  transcripts (exon or CDS) and more.\n\
@@ -74,6 +74,8 @@ Misc options: \n\
  --in-tlf: input GFF-like one-line-per-transcript format without exon/CDS\n\
            features (see --tlf option below); automatic if the input\n\
            filename ends with .tlf)\n\
+ --stream: fast processing of input GFF/BED transcripts as they are received\n\
+           ((no sorting, exons must be grouped by transcript in the input data)\n\
 Clustering:\n\
  -M/--merge : cluster the input transcripts into loci, discarding\n\
       \"duplicated\" transcripts (those with the same exact introns\n\
