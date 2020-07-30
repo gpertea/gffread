@@ -78,7 +78,7 @@ OBJS := ${GCLDIR}/GBase.o ${GCLDIR}/GArgs.o ${GCLDIR}/GFaSeqGet.o \
 all release debug memcheck memdebug profile gprof prof: ../gclib gffread
 
 ../gclib:
-	$(shell cd .. && git clone https://github.com/gpertea/gclib.git)
+	git clone https://github.com/gpertea/gclib.git ../gclib
 
 $(OBJS) : $(GCLDIR)/GBase.h $(GCLDIR)/gff.h
 gffread.o : gff_utils.h $(GCLDIR)/GBase.h $(GCLDIR)/gff.h
