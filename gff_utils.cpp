@@ -406,13 +406,16 @@ bool GffLoader::validateGffRec(GffObj* gffrec) {
 			}
 		}
 	}
-	if (multiExon && gffrec->exons.Count()<=1) {
-		return false;
-	}
-	if (wCDSonly && gffrec->CDstart==0) {
-		return false;
-	}
-	if (wNConly && gffrec->hasCDS()) return false;
+    if (gffrec->isTranscript()) {
+    	//these filters only apply to transcripts
+		if (multiExon && gffrec->exons.Count()<=1) {
+			return false;
+		}
+		if (wCDSonly && gffrec->CDstart==0) {
+			return false;
+		}
+		if (wNConly && gffrec->hasCDS()) return false;
+    }
 	return true;
 }
 
