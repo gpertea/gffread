@@ -17,6 +17,7 @@ FILE* f_y=NULL; //wrting fasta with translated CDS
 
 int maxintron=999000000;
 
+bool TFilters=false;
 bool wCDSonly=false;
 bool wNConly=false;
 int minLen=0; //minimum transcript length
@@ -406,15 +407,26 @@ bool GffLoader::validateGffRec(GffObj* gffrec) {
 			}
 		}
 	}
-    if (gffrec->isTranscript()) {
+    if (gffrec->isTranscript() && TFilters) {
     	//these filters only apply to transcripts
+    	bool reject=false;
 		if (multiExon && gffrec->exons.Count()<=1) {
-			return false;
+			reject=true;
+		} else if (wCDSonly && gffrec->CDstart==0) {
+			reject=true;
+		} else if (wNConly && gffrec->hasCDS()) reject=true;
+		if (reject) {
+			if (gffrec->parent!=NULL && keepGenes) {
+	    	   GPVec<GffObj>& pchildren=gffrec->parent->children;
+	    	   for (int c=0;c<pchildren.Count();c++) {
+	    		   if (pchildren[c]==gffrec) {
+	    			   pchildren.Delete(c);
+	    			   break;
+	    		   }
+	    	   }
+			}
+	    	return false;
 		}
-		if (wCDSonly && gffrec->CDstart==0) {
-			return false;
-		}
-		if (wNConly && gffrec->hasCDS()) return false;
     }
 	return true;
 }

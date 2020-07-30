@@ -558,7 +558,7 @@ int main(int argc, char* argv[]) {
  if (!s.is_empty()) maxintron=s.asInt();
  s=args.getOpt('l');
  if (!s.is_empty()) minLen=s.asInt();
-
+ TFilters=(multiExon || wCDSonly || wNConly); //TODO: all transcript filters should be included here through validateGffRec()
  FILE* f_repl=NULL; //duplicate/collapsing info output file
  s=args.getOpt('d');
  if (!s.is_empty()) {
@@ -622,6 +622,7 @@ int main(int argc, char* argv[]) {
    loadSeqInfo(fsize, seqinfo);
    fclose(fsize);
    }
+
 
  openfw(f_out, args, 'o');
  //if (f_out==NULL) f_out=stdout;
@@ -815,6 +816,8 @@ int main(int argc, char* argv[]) {
          //print other non-transcript (gene?) feature that might be there before t
            while (gfs_i<gdata->gfs.Count() && gdata->gfs[gfs_i]->start<=t.start) {
              GffObj& gfst=*(gdata->gfs[gfs_i]);
+             if (TFilters && gfst.isGene() && gfst.children.Count()==0) // gene with no children left, skip it if filters were applied
+            	 { ++gfs_i; continue; }
              if T_PRINTABLE(gfst.udata) { //never printed
                T_NO_PRINT(gfst.udata);
                if (fmtGFF3) {

@@ -17,6 +17,9 @@ extern int wPadding; //padding for -w option
 extern FILE* f_x; //writing fasta with spliced CDS
 extern FILE* f_y; //wrting fasta with translated CDS
 
+
+extern bool TFilters;
+
 extern int maxintron;
 
 extern bool wCDSonly;
@@ -113,7 +116,7 @@ char* getSeqDescr(char* seqid);
 char* getSeqName(char* seqid);
 int adjust_stopcodon(GffObj& gffrec, int adj, GList<GSeg>* seglst=NULL);
 void printTableData(FILE* f, GffObj& g, bool inFasta=false);
-bool validateGffRec(GffObj* gffrec);
+//bool validateGffRec(GffObj* gffrec);
 bool process_transcript(GFastaDb& gfasta, GffObj& gffrec);
 
 enum ETableFieldType {
