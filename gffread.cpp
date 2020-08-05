@@ -4,13 +4,14 @@
 #define __STDC_FORMAT_MACROS
 #include <inttypes.h>
 
-#define VERSION "0.12.1"
+#define VERSION "0.12.2"
 
 #define USAGE "gffread v" VERSION ". Usage:\n\
-gffread <input_gff> [-g <genomic_seqs_fasta> | <dir>][-s <seq_info.fsize>] \n\
+gffread <input_gff> [-g <genomic_seqs_fasta> | <dir>] [-s <seq_info.fsize>] \n\
  [-o <outfile>] [-t <trackname>] [-r [[<strand>]<chr>:]<start>..<end> [-R]]\n\
  [-CTVNJMKQAFPGUBHZWTOLE] [-w <exons.fa>] [-x <cds.fa>] [-y <tr_cds.fa>]\n\
- [-i <maxintron>] [--stream] [--bed] [--table <attrlist>] [--sort-by <ref.lst>]\n\
+ [--ids <IDs.lst> | --nids <IDs.lst>] [-i <maxintron>] [--stream] \n\
+ [--bed | --gtf | --tlf] [--table <attrlist>] [--sort-by <ref.lst>]\n\
  \n\
  Filter, convert or cluster GFF/GTF/BED records, extract the sequence of\n\
  transcripts (exon or CDS) and more.\n\
@@ -22,6 +23,8 @@ gffread <input_gff> [-g <genomic_seqs_fasta> | <dir>][-s <seq_info.fsize>] \n\
  \n\
 Options:\n\
  -i   discard transcripts having an intron larger than <maxintron>\n\
+ --ids discard records/transcripts if their IDs are not listed in <IDs.lst>\n\
+ --nids discard records/transcripts if their IDs are listed in <IDs.lst>\n\
  -l   discard transcripts shorter than <minlen> bases\n\
  -r   only show transcripts overlapping coordinate range <start>..<end>\n\
       (on chromosome/contig <chr>, strand <strand> if provided)\n\
@@ -78,7 +81,7 @@ Misc options: \n\
            ((no sorting, exons must be grouped by transcript in the input data)\n\
 Clustering:\n\
  -M/--merge : cluster the input transcripts into loci, discarding\n\
-      \"duplicated\" transcripts (those with the same exact introns\n\
+      \"redundant\" transcripts (those with the same exact introns\n\
       and fully contained or equal boundaries)\n\
  -d <dupinfo> : for -M option, write duplication info to file <dupinfo>\n\
  --cluster-only: same as -M/--merge but without discarding any of the\n\
@@ -110,7 +113,7 @@ Output options:\n\
  -W    for -w and -x options, write in the FASTA defline all the exon\n\
        coordinates projected onto the spliced sequence;\n\
  -S    for -y option, use '*' instead of '.' as stop codon translation\n\
- -L    Ensembl GTF to GFF3 conversion (implies -F; should be used with -m)\n\
+ -L    Ensembl GTF to GFF3 conversion (implies -F)\n\
  -m    <chr_replace> is a name mapping table for converting reference \n\
        sequence names, having this 2-column format:\n\
        <original_ref_ID> <new_ref_ID>\n\
@@ -136,60 +139,10 @@ Output options:\n\
        problems with the given GFF/GTF records\n\
 "
 
-/*
-FILE* ffasta=NULL;
-FILE* f_in=NULL;
-FILE* f_out=NULL;
-FILE* f_w=NULL; //writing fasta with spliced exons (transcripts)
-int wPadding = 0; //padding for -w option
-FILE* f_x=NULL; //writing fasta with spliced CDS
-FILE* f_y=NULL; //wrting fasta with translated CDS
-
-bool wCDSonly=false;
-bool wNConly=false;
-int minLen=0; //minimum transcript length
-bool validCDSonly=false; // translation with no in-frame STOP
-bool bothStrands=false; //for single-exon mRNA validation, check the other strand too
-bool altPhases=false; //if original phase fails translation validation,
-                     //try the other 2 phases until one makes it
-bool addCDSattrs=false;
-bool add_hasCDS=false;
-//bool streamIn=false; // --stream option
-bool adjustStop=false; //automatic adjust the CDS stop coordinate
-bool covInfo=false; // --cov-info : only report genome coverage
-GStr tableFormat; //list of "attributes" to print in tab delimited format
-bool spliceCheck=false; //only known splice-sites
-bool decodeChars=false; //decode url-encoded chars in attrs (-D)
-bool StarStop=false; //use * instead of . for stop codon translation
-bool fullCDSonly=false; // starts with START, ends with STOP codon
-*/
-
 GStr sortBy; //file name with chromosomes listed in the desired order
 
 bool BEDinput=false;
 bool TLFinput=false;
-
-//--- output options
-/*
-extern bool fmtGFF3=true; //default output: GFF3
-//other formats only make sense in transcriptOnly mode
-extern bool fmtGTF=false;
-extern bool fmtBED=false;
-extern bool fmtTLF=false;
-extern bool fmtTable=false;
-
-
-bool multiExon=false;
-bool writeExonSegs=false;
-char* tracklabel=NULL;
-char* rfltGSeq=NULL;
-char rfltStrand=0;
-uint rfltStart=0;
-uint rfltEnd=MAX_UINT;
-bool rfltWithin=false; //check for full containment within given range
-bool addDescr=false;
-
-*/
 
 //bool protmap=false;
 //int maxintron=999000000;
@@ -199,6 +152,21 @@ bool addDescr=false;
 GffLoader gffloader;
 
 GList<GenomicSeqData> g_data(true,true,true); //list of GFF records by genomic seq
+
+void loadIDlist(FILE* f, GHash<int> &idhash) {
+  GLineReader fr(f);
+  while (!fr.isEof()) {
+      char* line=fr.getLine();
+      if (line==NULL) break;
+      if (line[0]=='#') continue; //skip comments
+      GDynArray<char*> ids;
+      strsplit(line, ids);
+      for (uint i=0;i<ids.Count();i++) {
+    	  if (strlen(ids[i])>0)
+    		  idhash.Add(ids[i], new int(1));
+      }
+  }
+}
 
 void loadSeqInfo(FILE* f, GHash<SeqInfo> &si) {
   GLineReader fr(f);
@@ -422,7 +390,7 @@ void shutDown() {
 int main(int argc, char* argv[]) {
  GArgs args(argc, argv,
    "version;debug;merge;stream;adj-stop;bed;in-bed;tlf;in-tlf;cluster-only;nc;cov-info;help;"
-    "sort-alpha;keep-genes;w-add=;keep-comments;keep-exon-attrs;force-exons;t-adopt;gene2exon;"
+    "sort-alpha;keep-genes;w-add=;ids=;nids=0;gtf;keep-comments;keep-exon-attrs;force-exons;t-adopt;gene2exon;"
     "ignore-locus;no-pseudo;table=sort-by=hvOUNHPWCVJMKQYTDARSZFGLEBm:g:i:r:s:l:t:o:w:x:y:d:");
  args.printError(USAGE, true);
  if (args.getOpt('h') || args.getOpt("help")) {
@@ -448,9 +416,9 @@ int main(int argc, char* argv[]) {
  if (adjustStop) addCDSattrs=true;
  validCDSonly=(args.getOpt('V')!=NULL);
  altPhases=(args.getOpt('H')!=NULL);
- fmtGTF=(args.getOpt('T')!=NULL); //switch output format to GTF
- fmtBED=(args.getOpt("bed")!=NULL);
- fmtTLF=(args.getOpt("tlf")!=NULL);
+ fmtGTF=(args.getOpt('T')!=NULL || args.getOpt("gtf")!=NULL); //switch output format to GTF
+ fmtBED=(args.getOpt("bed")!=NULL); //BED output
+ fmtTLF=(args.getOpt("tlf")!=NULL); //TLF output
  if (fmtGTF || fmtBED || fmtTLF) {
 	 if (!gffloader.transcriptsOnly) {
 		 GMessage("Error: option -O is only supported with GFF3 output");
@@ -621,9 +589,26 @@ int main(int argc, char* argv[]) {
    if (fsize==NULL) GError("Error opening info file: %s\n",s.chars());
    loadSeqInfo(fsize, seqinfo);
    fclose(fsize);
+ }
+ s=args.getOpt("ids");
+ if (s.is_empty()) {
+	 s=args.getOpt("nids");
+	 if (!s.is_empty())
+		 IDflt=idFlt_Exclude;
+ } else {
+	 IDflt=idFlt_Only;
+ }
+ if (!s.is_empty()) {
+   FILE* f=fopen(s,"r");
+   if (f==NULL) GError("Error opening ID list file: %s\n",s.chars());
+   loadIDlist(f, fltIDs);
+   if (fltIDs.Count()==0) {
+	   GMessage("Warning: no IDs were loaded from file %s\n", s.chars());
+	   IDflt=idFlt_None;
    }
 
-
+   fclose(f);
+ }
  openfw(f_out, args, 'o');
  //if (f_out==NULL) f_out=stdout;
  if (gfasta.fastaPath==NULL && (validCDSonly || spliceCheck || args.getOpt('w')!=NULL || args.getOpt('x')!=NULL || args.getOpt('y')!=NULL))
@@ -727,8 +712,8 @@ int main(int argc, char* argv[]) {
        bool firstLocusPrint=true;
        GffLocus& loc=*(gdata->loci[l]);
        //check all non-replaced transcripts in this locus:
-       int numvalid=0;
-       int idxfirstvalid=-1;
+       //int numvalid=0;
+       //int idxfirstvalid=-1;
        for (int i=0;i<loc.rnas.Count();i++) {
          GffObj& t=*(loc.rnas[i]);
          GTData* tdata=(GTData*)(t.uptr);
@@ -753,15 +738,16 @@ int main(int argc, char* argv[]) {
          //restore strand for dOvlSET
          char orig_strand=T_OSTRAND(t.udata);
          if (orig_strand!=0) t.strand=orig_strand;
-
+         /* -- transcripts are filtered upon loading
          if (process_transcript(gfasta, t)) {
              numvalid++;
              if (idxfirstvalid<0) idxfirstvalid=i;
          }
+         */
        } //for each transcript
 
        int rnas_i=0;
-       if (idxfirstvalid>=0) rnas_i=idxfirstvalid;
+       //if (idxfirstvalid>=0) rnas_i=idxfirstvalid;
        int gfs_i=0;
        if (f_out) {
            GStr locname("RLOC_");
@@ -776,7 +762,8 @@ int main(int argc, char* argv[]) {
 					   if (firstGff3Print) { printGff3Header(f_out, args);firstGff3Print=false; }
 					   if (firstGSeqHeader) { printGSeqHeader(f_out, gdata); firstGSeqHeader=false; }
 					   if (firstLocusPrint) {
-						   loc.print(f_out, idxfirstvalid, locname, loctrack);
+						   //loc.print(f_out, idxfirstvalid, locname, loctrack);
+						   loc.print(f_out, 0, locname, loctrack);
 						   firstLocusPrint=false;
 					   }
 					   printGffObj(f_out, loc.gfs[gfs_i], locname, exonPrinting, out_counter);
@@ -790,7 +777,8 @@ int main(int argc, char* argv[]) {
 					     if (firstGff3Print) { printGff3Header(f_out, args); firstGff3Print=false; }
 					     if (firstGSeqHeader) { printGSeqHeader(f_out, gdata); firstGSeqHeader=false; }
 					     if (firstLocusPrint) {
-					    	 loc.print(f_out, idxfirstvalid, locname, loctrack);
+					    	 //loc.print(f_out, idxfirstvalid, locname, loctrack);
+					    	 loc.print(f_out, 0, locname, loctrack);
 					    	 firstLocusPrint=false;
 					     }
 				       }
@@ -805,7 +793,7 @@ int main(int argc, char* argv[]) {
    } //if Clustering enabled
   else { //no clustering
    //not grouped into loci, print the rnas with their parents, if any
-   int numvalid=0;
+   //int numvalid=0;
    for (int g=0;g<g_data.Count();g++) {
      GenomicSeqData* gdata=g_data[g];
      bool firstGSeqHeader=fmtGFF3;
@@ -832,8 +820,8 @@ int main(int argc, char* argv[]) {
         }
         GTData* tdata=(GTData*)(t.uptr);
         if (tdata->replaced_by!=NULL) continue;
-        if (process_transcript(gfasta, t)) {
-           numvalid++;
+        //if (process_transcript(gfasta, t)) {
+        //   numvalid++;
            if (f_out && T_PRINTABLE(t.udata) ) {
              T_NO_PRINT(t.udata);
              if (fmtGFF3 || fmtTable || t.isTranscript()) {
@@ -862,7 +850,7 @@ int main(int argc, char* argv[]) {
 					 t.printGxf(f_out, exonPrinting, tracklabel, NULL, decodeChars);
              }
            }//GFF/GTF output requested
-        } //valid transcript
+        //} //valid transcript
      } //for each rna
      //print the rest of the isolated pseudo/gene/region features not printed yet
      if (f_out && (fmtGFF3 || fmtTable)) {

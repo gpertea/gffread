@@ -17,6 +17,8 @@ FILE* f_y=NULL; //wrting fasta with translated CDS
 
 int maxintron=999000000;
 
+ID_Flt_Type IDflt=idFlt_None;
+
 bool TFilters=false;
 bool wCDSonly=false;
 bool wNConly=false;
@@ -61,6 +63,7 @@ GFastaDb gfasta;
 GHash<SeqInfo> seqinfo;
 GVec<CTableField> tableCols;
 GHash<RefTran> reftbl;
+GHash<int> fltIDs;
 
 GHash<int> isoCounter; //counts the valid isoforms
 
@@ -354,7 +357,28 @@ void printTableData(FILE* f, GffObj& g, bool inFasta) {
 	}
 	fprintf(f,"\n");
 }
+
 bool GffLoader::validateGffRec(GffObj* gffrec) {
+	if (!checkFilters(gffrec)) {
+		if (gffrec->isTranscript()) {
+			TFilters=true;
+			if (gffrec->parent!=NULL && keepGenes) {
+			   GPVec<GffObj>& pchildren=gffrec->parent->children;
+			   for (int c=0;c<pchildren.Count();c++) {
+				   if (pchildren[c]==gffrec) {
+					   pchildren.Delete(c);
+					   break;
+				   }
+			   }
+			}
+		}
+		return false;
+	} //transcript rejected
+	return true;
+}
+
+bool GffLoader::checkFilters(GffObj* gffrec) {
+	//TODO: move most of the transcript validation/filtering here!
 	if (reftbl.Count()>0) { //check if we need to reject by ref seq filter
 		GStr refname(gffrec->getRefName());
 		RefTran* rt=reftbl.Find(refname.chars());
@@ -379,6 +403,12 @@ bool GffLoader::validateGffRec(GffObj* gffrec) {
 		//discard generic "locus" features with no other detailed subfeatures
 		//GMessage("Warning: discarding %s GFF generic gene/locus container %s\n",gffrec->getID());
 		return false;
+	}
+	if (IDflt) {
+		if (fltIDs.hasKey(gffrec->getID())) {
+			if (IDflt==idFlt_Exclude) return false;
+		}
+		else if (IDflt==idFlt_Only) return false;
 	}
 	if (minLen>0 && gffrec->covlen<minLen) {
 		if (verbose)
@@ -407,27 +437,17 @@ bool GffLoader::validateGffRec(GffObj* gffrec) {
 			}
 		}
 	}
-    if (gffrec->isTranscript() && TFilters) {
+    if (gffrec->isTranscript()) {    // && TFilters) ?
     	//these filters only apply to transcripts
-    	bool reject=false;
 		if (multiExon && gffrec->exons.Count()<=1) {
-			reject=true;
-		} else if (wCDSonly && gffrec->CDstart==0) {
-			reject=true;
-		} else if (wNConly && gffrec->hasCDS()) reject=true;
-		if (reject) {
-			if (gffrec->parent!=NULL && keepGenes) {
-	    	   GPVec<GffObj>& pchildren=gffrec->parent->children;
-	    	   for (int c=0;c<pchildren.Count();c++) {
-	    		   if (pchildren[c]==gffrec) {
-	    			   pchildren.Delete(c);
-	    			   break;
-	    		   }
-	    	   }
-			}
-	    	return false;
+			return false;
 		}
-    }
+		if (wCDSonly && gffrec->CDstart==0) {
+			return false;
+		}
+		if (wNConly && gffrec->hasCDS()) return false;
+		return process_transcript(gfasta, *gffrec);
+    } //transcript filters check
 	return true;
 }
 
@@ -1350,21 +1370,19 @@ void GffLoader::load(GList<GenomicSeqData>& seqdata, GFFCommentParser* gf_parsec
 				delete t;
 				continue;
 			}
-			if (process_transcript(gfasta, *t)) {
-				outcounter++;
-				if (f_out) {
-				  if (fmtTable)
-						printTableData(f_out, *t);
-				  else //GFF3, GTF, BED, TLF
-					t->printGxf(f_out, exonPrinting, tracklabel, NULL, decodeChars);
-				}
+			//if (process_transcript(gfasta, *t))
+			outcounter++;
+			if (f_out) {
+			  if (fmtTable)
+					printTableData(f_out, *t);
+			  else //GFF3, GTF, BED, TLF
+				t->printGxf(f_out, exonPrinting, tracklabel, NULL, decodeChars);
 			}
 			delete t;
 		}
 		delete gffr;
 		return;
 	}
-
 
 	gffr->readAll();
 	GVec<int> pseudoFeatureIds; //feature type: pseudo*
@@ -1453,7 +1471,7 @@ void GffLoader::load(GList<GenomicSeqData>& seqdata, GFFCommentParser* gf_parsec
 			m->subftype_id=gff_fid_exon;
 		}
 		//GList<GffObj> gfadd(false,false); -- for gf_validate()?
-		if (!validateGffRec(m)) {
+		if (!validateGffRec(m)) { //this will also apply process_transcript() CDS filters etc.
 			continue;
 		}
 		m->isUsed(true); //so the gffreader won't destroy it

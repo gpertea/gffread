@@ -24,6 +24,15 @@ extern int maxintron;
 
 extern bool wCDSonly;
 extern bool wNConly;
+
+enum ID_Flt_Type {
+	idFlt_None=0,
+	idFlt_Only,
+	idFlt_Exclude
+};
+
+extern ID_Flt_Type IDflt;
+
 extern int minLen; //minimum transcript length
 extern bool validCDSonly; // translation with no in-frame STOP
 extern bool bothStrands; //for single-exon mRNA validation, check the other strand too
@@ -111,12 +120,12 @@ extern GFastaDb gfasta;
 extern GHash<SeqInfo> seqinfo;
 extern GHash<int> isoCounter; //counts the valid isoforms
 extern GHash<RefTran> reftbl;
+extern GHash<int> fltIDs;
 
 char* getSeqDescr(char* seqid);
 char* getSeqName(char* seqid);
 int adjust_stopcodon(GffObj& gffrec, int adj, GList<GSeg>* seglst=NULL);
 void printTableData(FILE* f, GffObj& g, bool inFasta=false);
-//bool validateGffRec(GffObj* gffrec);
 bool process_transcript(GFastaDb& gfasta, GffObj& gffrec);
 
 enum ETableFieldType {
@@ -715,6 +724,7 @@ class GffLoader {
   }
 
   bool validateGffRec(GffObj* gffrec);
+  bool checkFilters(GffObj* gffrec);
 
   void load(GList<GenomicSeqData>&seqdata, GFFCommentParser* gf_parsecomment=NULL);
 
