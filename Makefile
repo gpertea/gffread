@@ -11,7 +11,7 @@ LDFLAGS := $(if $(LDFLAGS),$(LDFLAGS),-g)
 
 BASEFLAGS  := -Wall -Wextra ${SEARCHDIRS} -D_FILE_OFFSET_BITS=64 \
 -D_LARGEFILE_SOURCE -D_REENTRANT -fno-strict-aliasing \
- -std=c++0x -fno-exceptions -fno-rtti
+ -std=c++11 -fno-exceptions -fno-rtti
 
 GCCV8 := $(shell expr `${CXX} -dumpversion | cut -f1 -d.` \>= 8)
 ifeq "$(GCCV8)" "1"
@@ -83,7 +83,7 @@ all release debug memcheck memdebug profile gprof prof: ../gclib gffread
 $(OBJS) : $(GCLDIR)/GBase.h $(GCLDIR)/gff.h
 gffread.o : gff_utils.h $(GCLDIR)/GBase.h $(GCLDIR)/gff.h
 gff_utils.o : gff_utils.h $(GCLDIR)/gff.h
-${GCLDIR}/gff.o : ${GCLDIR}/gff.h ${GCLDIR}/GFaSeqGet.h ${GCLDIR}/GList.hh ${GCLDIR}/GHash.hh
+${GCLDIR}/gff.o : ${GCLDIR}/gff.h ${GCLDIR}/GFaSeqGet.h ${GCLDIR}/GList.hh
 ${GCLDIR}/GFaSeqGet.o : ${GCLDIR}/GFaSeqGet.h
 gffread: $(OBJS) gffread.o
 	${LINKER} ${LDFLAGS} -o $@ ${filter-out %.a %.so, $^} ${LIBS}
