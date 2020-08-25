@@ -153,7 +153,7 @@ GffLoader gffloader;
 
 GList<GenomicSeqData> g_data(true,true,true); //list of GFF records by genomic seq
 
-void loadIDlist(FILE* f, GHash<int> &idhash) {
+void loadIDlist(FILE* f, GStrSet<> & idhash) {
   GLineReader fr(f);
   while (!fr.isEof()) {
       char* line=fr.getLine();
@@ -163,12 +163,12 @@ void loadIDlist(FILE* f, GHash<int> &idhash) {
       strsplit(line, ids);
       for (uint i=0;i<ids.Count();i++) {
     	  if (strlen(ids[i])>0)
-    		  idhash.Add(ids[i], new int(1));
+    		  idhash.Add(ids[i]);
       }
   }
 }
 
-void loadSeqInfo(FILE* f, GHash<SeqInfo> &si) {
+void loadSeqInfo(FILE* f, GHash<SeqInfo*> &si) {
   GLineReader fr(f);
   while (!fr.isEof()) {
       char* line=fr.getLine();
@@ -201,20 +201,20 @@ void loadSeqInfo(FILE* f, GHash<SeqInfo> &si) {
 void setTableFormat(GStr& s) {
 	 if (s.is_empty()) return;
 	 GHash<ETableFieldType> specialFields;
-	 specialFields.Add("chr", new ETableFieldType(ctfGFF_chr));
-	 specialFields.Add("id", new ETableFieldType(ctfGFF_ID));
-	 specialFields.Add("geneid", new ETableFieldType(ctfGFF_geneID));
-	 specialFields.Add("genename", new ETableFieldType(ctfGFF_geneName));
-	 specialFields.Add("parent", new ETableFieldType(ctfGFF_Parent));
-	 specialFields.Add("feature", new ETableFieldType(ctfGFF_feature));
-	 specialFields.Add("start", new ETableFieldType(ctfGFF_start));
-	 specialFields.Add("end", new ETableFieldType(ctfGFF_end));
-	 specialFields.Add("strand", new ETableFieldType(ctfGFF_strand));
-	 specialFields.Add("numexons", new ETableFieldType(ctfGFF_numexons));
-	 specialFields.Add("exons", new ETableFieldType(ctfGFF_exons));
-	 specialFields.Add("cds", new ETableFieldType(ctfGFF_cds));
-	 specialFields.Add("covlen", new ETableFieldType(ctfGFF_covlen));
-	 specialFields.Add("cdslen", new ETableFieldType(ctfGFF_cdslen));
+	 specialFields.Add("chr", ctfGFF_chr);
+	 specialFields.Add("id", ctfGFF_ID);
+	 specialFields.Add("geneid", ctfGFF_geneID);
+	 specialFields.Add("genename", ctfGFF_geneName);
+	 specialFields.Add("parent", ctfGFF_Parent);
+	 specialFields.Add("feature", ctfGFF_feature);
+	 specialFields.Add("start", ctfGFF_start);
+	 specialFields.Add("end", ctfGFF_end);
+	 specialFields.Add("strand", ctfGFF_strand);
+	 specialFields.Add("numexons", ctfGFF_numexons);
+	 specialFields.Add("exons", ctfGFF_exons);
+	 specialFields.Add("cds", ctfGFF_cds);
+	 specialFields.Add("covlen", ctfGFF_covlen);
+	 specialFields.Add("cdslen", ctfGFF_cdslen);
 
 	 s.startTokenize(" ,;.:", tkCharSet);
 	 GStr w;
@@ -255,7 +255,7 @@ void setTableFormat(GStr& s) {
 	 }
 }
 
-void loadRefTable(FILE* f, GHash<RefTran>& rt) {
+void loadRefTable(FILE* f, GHash<RefTran*>& rt) {
   GLineReader fr(f);
   char* line=NULL;
   while ((line=fr.getLine())) {

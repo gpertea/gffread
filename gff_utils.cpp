@@ -1,6 +1,6 @@
 #include "gff_utils.h"
 
-GHash<GeneInfo> gene_ids;
+GHash<GeneInfo*> gene_ids;
 
 bool verbose=false; //same with GffReader::showWarnings and GffLoader::beVserbose
 bool debugMode=false;
@@ -60,10 +60,10 @@ GffPrintMode exonPrinting=pgffAny;
 
 GFastaDb gfasta;
 
-GHash<SeqInfo> seqinfo;
+GHash<SeqInfo*> seqinfo;
 GVec<CTableField> tableCols;
-GHash<RefTran> reftbl;
-GHash<int> fltIDs;
+GHash<RefTran*> reftbl;
+GStrSet<> fltIDs;
 
 GHash<int> isoCounter; //counts the valid isoforms
 
@@ -378,7 +378,6 @@ bool GffLoader::validateGffRec(GffObj* gffrec) {
 }
 
 bool GffLoader::checkFilters(GffObj* gffrec) {
-	//TODO: move most of the transcript validation/filtering here!
 	if (reftbl.Count()>0) { //check if we need to reject by ref seq filter
 		GStr refname(gffrec->getRefName());
 		RefTran* rt=reftbl.Find(refname.chars());
@@ -486,13 +485,13 @@ bool process_transcript(GFastaDb& gfasta, GffObj& gffrec) {
           }
       }
  if (gname && strcmp(gname, gffrec.getID())!=0) {
-   int* isonum=isoCounter.Find(gname);
-   if  (isonum==NULL) {
-       isonum=new int(1);
-       isoCounter.Add(gname,isonum);
-       }
-      else (*isonum)++;
-   //defline.appendfmt(" gene=%s", gname);
+	   int* isonum=isoCounter.Find(gname);
+	   if  (isonum==NULL) {
+		   //isonum=new int(1);
+		   isoCounter.Add(gname,1);
+	   }
+		else (*isonum)++;
+	   //defline.appendfmt(" gene=%s", gname);
    }
   int seqlen=0;
 
@@ -1204,9 +1203,9 @@ void collectLocusData(GList<GenomicSeqData>& ref_data, bool covInfo) {
 		GenomicSeqData* gdata=ref_data[g];
 		for (int l=0;l<gdata->loci.Count();l++) {
 			GffLocus& loc=*(gdata->loci[l]);
-			GHash<int> gnames(true); //gene names in this locus
+			GHash<int> gnames; //gene names in this locus
 			//GHash<int> geneids(true); //Entrez GeneID: numbers
-			GHash<int> geneids(true);
+			GHash<int> geneids;
 			int fstrand=0,rstrand=0,ustrand=0;
 			for (int i=0;i<loc.rnas.Count();i++) {
 				GffObj& t=*(loc.rnas[i]);
@@ -1220,11 +1219,14 @@ void collectLocusData(GList<GenomicSeqData>& ref_data, bool covInfo) {
 					gname.upper();
 					int* prevg=gnames.Find(gname.chars());
 					if (prevg!=NULL) (*prevg)++;
-					else gnames.Add(gname, new int(1));
+					else gnames.Add(gname.chars(), 1);
 				}
 				GStr geneid(t.getGeneID());
-				if (!geneid.is_empty())
-					geneids.Add(geneid.chars());
+				if (!geneid.is_empty()) {
+					int* prevg=gnames.Find(geneid.chars());
+					if (prevg!=NULL) (*prevg)++;
+					geneids.Add(geneid.chars(), 1);
+				}
 				//parse GeneID xrefs, if any (RefSeq):
 				/*
 				GStr xrefs(t.getAttr("xrefs"));
@@ -1255,11 +1257,13 @@ void collectLocusData(GList<GenomicSeqData>& ref_data, bool covInfo) {
 						gname.upper();
 						int* prevg=gnames.Find(gname.chars());
 						if (prevg!=NULL) (*prevg)++;
-						else gnames.Add(gname, new int(1));
+						else gnames.Add(gname, 1);
 					}
 					GStr geneid(nt.getID());
 					if (!geneid.is_empty()) {
-						geneids.Add(geneid.chars(), new int(1));
+						int* prevg=gnames.Find(geneid.chars());
+						if (prevg!=NULL) (*prevg)++;
+						geneids.Add(geneid.chars(),1);
 					}
 				}
 				//parse GeneID xrefs, if any (RefSeq):
@@ -1293,18 +1297,18 @@ void collectLocusData(GList<GenomicSeqData>& ref_data, bool covInfo) {
 			loc.locus_num=locus_num;
 			if (gnames.Count()>0) { //collect all gene names associated to this locus
 				gnames.startIterate();
-				int* gfreq=NULL;
-				char* key=NULL;
-				while ((gfreq=gnames.NextData(key))!=NULL) {
-					loc.gene_names.AddIfNew(new CGeneSym(key,*gfreq));
+				int gfreq=0;
+				const char* key=NULL;
+				while ((key=gnames.Next(gfreq))!=NULL) {
+					loc.gene_names.AddIfNew(new CGeneSym(key, gfreq));
 				}
 			} //added collected gene_names
 			if (geneids.Count()>0) { //collect all GeneIDs names associated to this locus
 				geneids.startIterate();
-				int* gfreq=NULL;
-				char* key=NULL;
-				while ((gfreq=geneids.NextData(key))!=NULL) {
-					loc.gene_ids.AddIfNew(new CGeneSym(key,*gfreq));
+				int gfreq=0;
+				const char* key=NULL;
+				while ((key=geneids.Next(gfreq))!=NULL) {
+					loc.gene_ids.AddIfNew(new CGeneSym(key, gfreq));
 				}
 			}
 		} //for each locus

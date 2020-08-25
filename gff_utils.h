@@ -117,10 +117,10 @@ class RefTran {
 };
 
 extern GFastaDb gfasta;
-extern GHash<SeqInfo> seqinfo;
+extern GHash<SeqInfo*> seqinfo;
 extern GHash<int> isoCounter; //counts the valid isoforms
-extern GHash<RefTran> reftbl;
-extern GHash<int> fltIDs;
+extern GHash<RefTran*> reftbl;
+extern GStrSet<> fltIDs;
 
 char* getSeqDescr(char* seqid);
 char* getSeqName(char* seqid);
