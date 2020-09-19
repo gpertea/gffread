@@ -856,6 +856,8 @@ int main(int argc, char* argv[]) {
      if (f_out && (fmtGFF3 || fmtTable)) {
       while (gfs_i<gdata->gfs.Count()) {
          GffObj& gfst=*(gdata->gfs[gfs_i]);
+         if (TFilters && gfst.isGene() && gfst.children.Count()==0) // gene with no children left, skip it if filters were applied
+        	 { ++gfs_i; continue; }
          if T_PRINTABLE(gfst.udata) { //never printed
            T_NO_PRINT(gfst.udata);
            if (fmtGFF3) {
