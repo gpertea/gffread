@@ -17,6 +17,8 @@ extern int wPadding; //padding for -w option
 extern FILE* f_x; //writing fasta with spliced CDS
 extern FILE* f_y; //wrting fasta with translated CDS
 
+extern FILE* f_j; //wrting junctions (introns)
+
 
 extern bool TFilters;
 
@@ -160,6 +162,75 @@ extern GVec<CTableField> tableCols; //table output format fields
 class GffLocus;
 class GenomicSeqData;
 class GeneInfo;
+
+struct CIntronData:public GSeg {
+	char strand;//'.' < '-' < '+' (reverse ASCII order)
+	GVec<GStr> ts; //list of transcript IDs sharing this intron
+	CIntronData(uint istart, uint iend, char tstrand, const char* t_id=NULL):GSeg(istart, iend),
+			strand(tstrand) {
+		if (t_id!=NULL) {
+			GStr tid(t_id);
+		    ts.Add(tid);
+		}
+	}
+	void add(const char* t_id) {
+		 GStr tid(t_id);
+		 ts.Add(tid);
+	}
+	bool operator==(CIntronData& d){
+	  return (start==d.start && end==d.end && strand==d.strand);
+	}
+	bool operator<(CIntronData& d){
+	 if (start==d.start) {
+		 if (end==d.end) return strand>d.strand;
+			else return (end<d.end);
+	  }
+	  else return (start<d.start);
+	}
+
+};
+
+struct CIntronList {
+	int gseq_id;
+	uint last_t_start; //just to check if input is sorted properly!
+	GList<CIntronData> jlst;
+	CIntronList():gseq_id(-1),last_t_start(0), jlst(true, true) {}
+	void add(GffObj& t) { //add all introns of t to jlst
+		if (t.exons.Count()<2) return; //nothing to do
+		if (gseq_id>=0 && gseq_id!=t.gseq_id)
+			GError("Error: CIntronList::add(%s) on different ref seq!\n", t.getID());
+		gseq_id=t.gseq_id;
+		for (int i=1;i<t.exons.Count();++i) {
+		  CIntronData* nintr = new CIntronData(t.exons[i-1]->end+1,
+				  t.exons[i]->start-1, t.strand, t.getID());
+		  int fidx=-1;
+		  CIntronData* xintr=jlst.AddIfNew(nintr, true, &fidx);
+		  if (xintr!=nintr) {
+			  //nintr already exists,it was deallocated
+			  xintr->add(t.getID());
+		  }
+		  last_t_start=t.start;
+		} //for each intron
+	}
+	void clear() {
+		gseq_id=-1;
+		last_t_start=0;
+		jlst.Clear();
+	}
+	void print(FILE* f) {
+		//simple tab delimited format: chr, start, end, strand, transcriptIDs comma delimited
+		const char* gseqname=GffObj::names->gseqs.getName(gseq_id);
+		for (int i=0;i<jlst.Count();++i) {
+			CIntronData& idata=*(jlst[i]);
+			fprintf(f,"%s\t%d\t%d\t%c\t",gseqname, idata.start, idata.end, idata.strand);
+			for (int t=0;t<idata.ts.Count();t++) {
+				if (t) fprintf(f, ",%s", idata.ts[t].chars());
+				  else fprintf(f,  "%s", idata.ts[t].chars());
+			}
+			fprintf(f, "\n");
+		}
+	}
+};
 
 class GTData { // transcript associated data
  public:
@@ -674,6 +745,7 @@ class GffLoader {
   GStr fname;
   FILE* f;
   GffNames* names;
+  CIntronList intronList; // collect introns for -j output
   union {
 	  unsigned int options;
 	  struct {
@@ -701,7 +773,7 @@ class GffLoader {
 	  };
   };
 
-  GffLoader():fname(),f(NULL), names(NULL), options(0) {
+  GffLoader():fname(),f(NULL), names(NULL), intronList(), options(0) {
       transcriptsOnly=true;
       gffnames_ref(GffObj::names);
       names=GffObj::names;
@@ -726,9 +798,12 @@ class GffLoader {
   bool validateGffRec(GffObj* gffrec);
   bool checkFilters(GffObj* gffrec);
 
+  void collectIntrons(GffObj& t); //for -j output
+
   void load(GList<GenomicSeqData>&seqdata, GFFCommentParser* gf_parsecomment=NULL);
 
   bool placeGf(GffObj* t, GenomicSeqData* gdata);
+
 
   bool unsplContained(GffObj& ti, GffObj&  tj);
   GffObj* redundantTranscripts(GffObj& ti, GffObj&  tj);

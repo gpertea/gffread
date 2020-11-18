@@ -105,6 +105,7 @@ Output options:\n\
  -g   full path to a multi-fasta file with the genomic sequences\n\
       for all input mappings, OR a directory with single-fasta files\n\
       (one per genomic sequence, with file names matching sequence names)\n\
+ -j    write a tab delimited file with all the junctions (intron coordinates)\n\
  -w    write a fasta file with spliced exons for each transcript\n\
  --w-add <N> for the -w option, extract additional <N> bases\n\
        both upstream and downstream of the transcript boundaries\n\
@@ -385,13 +386,14 @@ void shutDown() {
 	FWCLOSE(f_w);
 	FWCLOSE(f_x);
 	FWCLOSE(f_y);
+	FWCLOSE(f_j);
 }
 
 int main(int argc, char* argv[]) {
  GArgs args(argc, argv,
    "version;debug;merge;stream;adj-stop;bed;in-bed;tlf;in-tlf;cluster-only;nc;cov-info;help;"
     "sort-alpha;keep-genes;w-add=;ids=;nids=0;gtf;keep-comments;keep-exon-attrs;force-exons;t-adopt;gene2exon;"
-    "ignore-locus;no-pseudo;table=sort-by=hvOUNHPWCVJMKQYTDARSZFGLEBm:g:i:r:s:l:t:o:w:x:y:d:");
+    "ignore-locus;no-pseudo;table=sort-by=hvOUNHPWCVJMKQYTDARSZFGLEBm:g:i:r:s:l:t:o:w:x:y:j:d:");
  args.printError(USAGE, true);
  if (args.getOpt('h') || args.getOpt("help")) {
     GMessage("%s",USAGE);
@@ -478,7 +480,7 @@ int main(int argc, char* argv[]) {
      args.printCmdLine(stderr);
      }
  if (args.getOpt("version")) {
-  GMessage(VERSION"\n");
+  printf(VERSION"\n");
   exit(0);
  }
  gffloader.fullAttributes=(args.getOpt('F')!=NULL);
@@ -616,6 +618,7 @@ int main(int argc, char* argv[]) {
  openfw(f_w, args, 'w');
  openfw(f_x, args, 'x');
  openfw(f_y, args, 'y');
+ openfw(f_j, args, 'j');
  s=args.getOpt("w-add");
  if (!s.is_empty()) {
 	 if (f_w==NULL) GError("Error: --w-add option requires -w option!\n");

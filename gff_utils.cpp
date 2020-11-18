@@ -14,6 +14,7 @@ int wPadding = 0; //padding for -w option
 FILE* f_x=NULL; //writing fasta with spliced CDS
 FILE* f_y=NULL; //wrting fasta with translated CDS
 
+FILE* f_j=NULL; //wrting junctions (intron coordinates)
 
 int maxintron=999000000;
 
@@ -1350,6 +1351,21 @@ GenomicSeqData* getGSeqData(GList<GenomicSeqData>& seqdata, int gseq_id) {
 void warnPseudo(GffObj& m) {
 	GMessage("Info: pseudo gene/transcript record with ID=%s discarded.\n",m.getID());
 }
+void GffLoader::collectIntrons(GffObj& t) {
+	// assume t are coming grouped by chromosome and sorted by start coordinate!
+	if (intronList.jlst.Count()>0) {
+         if (t.gseq_id!=intronList.gseq_id ||
+        		 t.start>=intronList.jlst.Last()->start) {
+        	intronList.print(f_j);
+        	intronList.clear();
+         }
+         else if (t.start<intronList.last_t_start)
+        	 GError("Error collectIntrons(%s) called when last_t_start was %d\n",
+        			 t.getID(), intronList.last_t_start );
+         //add this transcript's introns
+	}
+    intronList.add(t);
+}
 
 void GffLoader::load(GList<GenomicSeqData>& seqdata, GFFCommentParser* gf_parsecomment) {
 	if (f==NULL) GError("Error: GffLoader::load() cannot be called before ::openFile()!\n");
@@ -1374,7 +1390,10 @@ void GffLoader::load(GList<GenomicSeqData>& seqdata, GFFCommentParser* gf_parsec
 				delete t;
 				continue;
 			}
-			//if (process_transcript(gfasta, *t))
+
+			if (f_j!=NULL && t->isTranscript() && t->exons.Count()>1)
+				collectIntrons(*t);
+
 			outcounter++;
 			if (f_out) {
 			  if (fmtTable)
@@ -1383,6 +1402,10 @@ void GffLoader::load(GList<GenomicSeqData>& seqdata, GFFCommentParser* gf_parsec
 				t->printGxf(f_out, exonPrinting, tracklabel, NULL, decodeChars);
 			}
 			delete t;
+		}
+		if (f_j && intronList.jlst.Count()>0) {
+        	intronList.print(f_j);
+        	intronList.clear();
 		}
 		delete gffr;
 		return;
@@ -1478,6 +1501,9 @@ void GffLoader::load(GList<GenomicSeqData>& seqdata, GFFCommentParser* gf_parsec
 		if (!validateGffRec(m)) { //this will also apply process_transcript() CDS filters etc.
 			continue;
 		}
+		if (f_j!=NULL && m->isTranscript() && m->exons.Count()>1)
+			collectIntrons(*m);
+
 		m->isUsed(true); //so the gffreader won't destroy it
 		GenomicSeqData* gdata=getGSeqData(seqdata, m->gseq_id);
 		bool keep=placeGf(m, gdata);
@@ -1487,6 +1513,10 @@ void GffLoader::load(GList<GenomicSeqData>& seqdata, GFFCommentParser* gf_parsec
 			//GMessage("Feature %s(%d-%d) is going to be discarded..\n",m->getID(), m->start, m->end);
 		}
 	} //for each read gffObj
+	if (f_j && intronList.jlst.Count()>0) {
+    	intronList.print(f_j);
+    	intronList.clear();
+	}
 	//if (verbose) GMessage("  .. %d records from %s clustered into loci.\n", gffr->gflst.Count(), fname.chars());
 	//if (f && f!=stdin) { fclose(f); f=NULL; }
 	delete gffr;
