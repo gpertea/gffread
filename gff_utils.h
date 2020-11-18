@@ -223,6 +223,8 @@ struct CIntronList {
 		for (int i=0;i<jlst.Count();++i) {
 			CIntronData& idata=*(jlst[i]);
 			fprintf(f,"%s\t%d\t%d\t%c\t",gseqname, idata.start, idata.end, idata.strand);
+			if (idata.ts.Count()>1)
+				idata.ts.Sort();
 			for (int t=0;t<idata.ts.Count();t++) {
 				if (t) fprintf(f, ",%s", idata.ts[t].chars());
 				  else fprintf(f,  "%s", idata.ts[t].chars());
