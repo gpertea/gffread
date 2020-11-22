@@ -568,6 +568,7 @@ bool process_transcript(GFastaDb& gfasta, GffObj& gffrec) {
     int phaseNum=0;
   CDS_CHECK:
     uint cds_olen=0;
+    inframeStop=false;
     cdsnt=gffrec.getSpliced(faseq, true, &seqlen, NULL, &cds_olen, &seglst, adjustStop);
     //if adjustStop, seqlen has the CDS+3'UTR length, but cds_olen still has the original CDS length
     if (cdsnt!=NULL && cdsnt[0]!='\0') { //has CDS
