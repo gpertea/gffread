@@ -49,6 +49,7 @@ uint rfltEnd=MAX_UINT;
 bool rfltWithin=false; //check for full containment within given range
 bool addDescr=false;
 
+bool wfaNoCDS=false;
 
 bool fmtGFF3=true; //default output: GFF3
 //other formats only make sense in transcriptOnly mode
@@ -65,6 +66,8 @@ GHash<SeqInfo*> seqinfo;
 GVec<CTableField> tableCols;
 GHash<RefTran*> reftbl;
 GStrSet<> fltIDs;
+
+GStrSet<> attrList;
 
 GHash<int> isoCounter; //counts the valid isoforms
 
@@ -437,6 +440,11 @@ bool GffLoader::checkFilters(GffObj* gffrec) {
 			}
 		}
 	}
+	if (this->attrsFilter) { //mostly relevant for transcripts and gene records
+		//remove attributes that are not in attrList
+		gffrec->removeAttrs(attrList);
+	}
+
     if (gffrec->isTranscript()) {    // && TFilters) ?
     	//these filters only apply to transcripts
 		if (multiExon && gffrec->exons.Count()<=1) {
@@ -730,7 +738,7 @@ bool process_transcript(GFastaDb& gfasta, GffObj& gffrec) {
 
 	  GStr defline(gffrec.getID());
 	  if (exont!=NULL) {
-		  if (gffrec.CDstart>0) {
+		  if (!wfaNoCDS && gffrec.CDstart>0) {
 			  defline.appendfmt(" CDS=%d-%d", cds_start, cds_end);
 		  }
 		  if (writeExonSegs) {
@@ -1382,6 +1390,7 @@ void GffLoader::load(GList<GenomicSeqData>& seqdata, GFFCommentParser* gf_parsec
 	gffr->keepGenes(keepGenes);
 	gffr->setIgnoreLocus(ignoreLocus);
 	gffr->setRefAlphaSorted(this->sortRefsAlpha);
+	gffr->procEnsemblID(this->ensemblProc);
 	if (keepGff3Comments && gf_parsecomment!=NULL) gffr->setCommentParser(gf_parsecomment);
     int outcounter=0;
 	if (streamIn) { //this will ignore any clustering options

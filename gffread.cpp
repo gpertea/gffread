@@ -4,14 +4,14 @@
 #define __STDC_FORMAT_MACROS
 #include <inttypes.h>
 
-#define VERSION "0.12.3"
+#define VERSION "0.12.4"
 
 #define USAGE "gffread v" VERSION ". Usage:\n\
 gffread <input_gff> [-g <genomic_seqs_fasta> | <dir>] [-s <seq_info.fsize>] \n\
  [-o <outfile>] [-t <trackname>] [-r [[<strand>]<chr>:]<start>..<end> [-R]]\n\
  [-CTVNJMKQAFPGUBHZWTOLE] [-w <exons.fa>] [-x <cds.fa>] [-y <tr_cds.fa>]\n\
- [--ids <IDs.lst> | --nids <IDs.lst>] [-i <maxintron>] [--stream] \n\
- [--bed | --gtf | --tlf] [--table <attrlist>] [--sort-by <ref.lst>]\n\
+ [--ids <IDs.lst> | --nids <IDs.lst>] [--attrs <attr-list>] [-i <maxintron>]\n\
+ [--stream] [--bed | --gtf | --tlf] [--table <attrlist>] [--sort-by <ref.lst>]\n\
  \n\
  Filter, convert or cluster GFF/GTF/BED records, extract the sequence of\n\
  transcripts (exon or CDS) and more.\n\
@@ -45,11 +45,13 @@ Sorting: (by default, chromosomes are kept in the order they were found)\n\
  --sort-by : sort the reference sequences by the order in which their\n\
       names are given in the <refseq.lst> file\n\
 Misc options: \n\
- -F   preserve all GFF attributes (for non-exon features)\n\
+ -F   keep all GFF attributes (for non-exon features)\n\
  --keep-exon-attrs : for -F option, do not attempt to reduce redundant\n\
       exon/CDS attributes\n\
  -G   do not keep exon attributes, move them to the transcript feature\n\
       (for GFF3 output)\n\
+ --attrs <attr-list> only output the GTF/GFF attributes listed in <attr-list>\n\
+    which is a comma delimited list of attribute names to\n\
  --keep-genes : in transcript-only mode (default), also preserve gene records\n\
  --keep-comments: for GFF3 input/output, try to preserve comments\n\
  -O   process other non-transcript GFF records (by default non-transcript\n\
@@ -109,21 +111,22 @@ Output options:\n\
  -w    write a fasta file with spliced exons for each transcript\n\
  --w-add <N> for the -w option, extract additional <N> bases\n\
        both upstream and downstream of the transcript boundaries\n\
+ --w-nocds for -w, disable the output of CDS info in the FASTA file\n\
  -x    write a fasta file with spliced CDS for each GFF transcript\n\
  -y    write a protein fasta file with the translation of CDS for each record\n\
  -W    for -w and -x options, write in the FASTA defline all the exon\n\
        coordinates projected onto the spliced sequence;\n\
  -S    for -y option, use '*' instead of '.' as stop codon translation\n\
- -L    Ensembl GTF to GFF3 conversion (implies -F)\n\
+ -L    Ensembl GTF to GFF3 conversion, adds version to IDs\n\
  -m    <chr_replace> is a name mapping table for converting reference \n\
        sequence names, having this 2-column format:\n\
        <original_ref_ID> <new_ref_ID>\n\
  -t    use <trackname> in the 2nd column of each GFF/GTF output line\n\
- -o    write the records into <outfile> instead of stdout\n\
+ -o    write the output records into <outfile> instead of stdout\n\
  -T    main output will be GTF instead of GFF3\n\
  --bed output records in BED format instead of default GFF3\n\
  --tlf output \"transcript line format\" which is like GFF\n\
-       but exons, CDS features and related data are stored as GFF \n\
+       but with exons and CDS related features stored as GFF \n\
        attributes in the transcript feature line, like this:\n\
          exoncount=N;exons=<exons>;CDSphase=<N>;CDS=<CDScoords> \n\
        <exons> is a comma-delimited list of exon_start-exon_end coordinates;\n\
@@ -197,6 +200,16 @@ void loadSeqInfo(FILE* f, GHash<SeqInfo*> &si) {
       // --- here we have finished parsing the line
       si.Add(id, new SeqInfo(len,text));
       } //while lines
+}
+
+void getAttrList(GStr& s) {
+	 if (s.is_empty()) return;
+	 s.startTokenize(",;:", tkCharSet);
+	 GStr w;
+	 while (s.nextToken(w)) {
+		  if (w.length()>0)
+    	    attrList.Add(w.chars());
+	 }
 }
 
 void setTableFormat(GStr& s) {
@@ -392,7 +405,7 @@ void shutDown() {
 int main(int argc, char* argv[]) {
  GArgs args(argc, argv,
    "version;debug;merge;stream;adj-stop;bed;in-bed;tlf;in-tlf;cluster-only;nc;cov-info;help;"
-    "sort-alpha;keep-genes;w-add=;ids=;nids=0;gtf;keep-comments;keep-exon-attrs;force-exons;t-adopt;gene2exon;"
+    "sort-alpha;keep-genes;w-nocds;attrs=;w-add=;ids=;nids=0;gtf;keep-comments;keep-exon-attrs;force-exons;t-adopt;gene2exon;"
     "ignore-locus;no-pseudo;table=sort-by=hvOUNHPWCVJMKQYTDARSZFGLEBm:g:i:r:s:l:t:o:w:x:y:j:d:");
  args.printError(USAGE, true);
  if (args.getOpt('h') || args.getOpt("help")) {
@@ -499,8 +512,8 @@ int main(int argc, char* argv[]) {
 	 gffloader.gatherExonAttrs=true;
 	 gffloader.fullAttributes=true;
  }
- ensembl_convert=(args.getOpt('L')!=NULL);
- if (ensembl_convert) {
+ gffloader.ensemblProc=(args.getOpt('L')!=NULL);
+ if (gffloader.ensemblProc) {
     gffloader.fullAttributes=true;
     gffloader.gatherExonAttrs=false;
     //sortByLoc=true;
@@ -539,6 +552,12 @@ int main(int argc, char* argv[]) {
    }
  }
 
+ s=args.getOpt("attrs");
+ if (!s.is_empty()) {
+	 getAttrList(s);
+	 gffloader.attrsFilter=(attrList.Count()>1);
+	 gffloader.fullAttributes=true;
+ }
  rfltWithin=(args.getOpt('R')!=NULL);
  s=args.getOpt('r');
  if (!s.is_empty()) {
@@ -608,7 +627,6 @@ int main(int argc, char* argv[]) {
 	   GMessage("Warning: no IDs were loaded from file %s\n", s.chars());
 	   IDflt=idFlt_None;
    }
-
    fclose(f);
  }
  openfw(f_out, args, 'o');
@@ -624,6 +642,9 @@ int main(int argc, char* argv[]) {
 	 if (f_w==NULL) GError("Error: --w-add option requires -w option!\n");
 	 wPadding=s.asInt();
  }
+
+ if (f_w!=NULL && args.getOpt("w-nocds"))
+	 wfaNoCDS=true;
 
  if (f_out==NULL && f_w==NULL && f_x==NULL && f_y==NULL && !covInfo)
 	 f_out=stdout;

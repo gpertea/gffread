@@ -22,6 +22,8 @@ extern FILE* f_j; //wrting junctions (introns)
 
 extern bool TFilters;
 
+extern bool wfaNoCDS;
+
 extern int maxintron;
 
 extern bool wCDSonly;
@@ -122,7 +124,6 @@ extern GFastaDb gfasta;
 extern GHash<SeqInfo*> seqinfo;
 extern GHash<int> isoCounter; //counts the valid isoforms
 extern GHash<RefTran*> reftbl;
-extern GStrSet<> fltIDs;
 
 char* getSeqDescr(char* seqid);
 char* getSeqName(char* seqid);
@@ -158,6 +159,8 @@ class CTableField {
 
 
 extern GVec<CTableField> tableCols; //table output format fields
+extern GStrSet<> attrList;
+extern GStrSet<> fltIDs;
 
 class GffLocus;
 class GenomicSeqData;
@@ -772,6 +775,8 @@ class GffLoader {
 		bool dOvlSET:1; //discard overlapping Single Exon Transcripts on any strand
 		bool forceExons:1;
 		bool streamIn:1;
+		bool ensemblProc:1;
+		bool attrsFilter:1;
 	  };
   };
 
