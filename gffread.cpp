@@ -7,19 +7,17 @@
 #define VERSION "0.12.4"
 
 #define USAGE "gffread v" VERSION ". Usage:\n\
-gffread <input_gff> [-g <genomic_seqs_fasta> | <dir>] [-s <seq_info.fsize>] \n\
+gffread [-g <genomic_seqs_fasta> | <dir>] [-s <seq_info.fsize>] \n\
  [-o <outfile>] [-t <trackname>] [-r [[<strand>]<chr>:]<start>..<end> [-R]]\n\
  [-CTVNJMKQAFPGUBHZWTOLE] [-w <exons.fa>] [-x <cds.fa>] [-y <tr_cds.fa>]\n\
  [--ids <IDs.lst> | --nids <IDs.lst>] [--attrs <attr-list>] [-i <maxintron>]\n\
  [--stream] [--bed | --gtf | --tlf] [--table <attrlist>] [--sort-by <ref.lst>]\n\
- \n\
+ [<input_gff>] \n\n\
  Filter, convert or cluster GFF/GTF/BED records, extract the sequence of\n\
  transcripts (exon or CDS) and more.\n\
  By default (i.e. without -O) only transcripts are processed, discarding any\n\
  other non-transcript features. Default output is a simplified GFF3 with only\n\
  the basic attributes.\n\
- \n\
- <input_gff> is a GFF file, use '-' for stdin\n\
  \n\
 Options:\n\
  -i   discard transcripts having an intron larger than <maxintron>\n\
@@ -408,7 +406,8 @@ int main(int argc, char* argv[]) {
     "sort-alpha;keep-genes;w-nocds;attrs=;w-add=;ids=;nids=0;gtf;keep-comments;keep-exon-attrs;force-exons;t-adopt;gene2exon;"
     "ignore-locus;no-pseudo;table=sort-by=hvOUNHPWCVJMKQYTDARSZFGLEBm:g:i:r:s:l:t:o:w:x:y:j:d:");
  args.printError(USAGE, true);
- if (args.getOpt('h') || args.getOpt("help")) {
+ int numfiles = args.startNonOpt();
+ if (args.getOpt('h') || args.getOpt("help") || ( numfiles==0 && !hasStdInput())) {
     GMessage("%s",USAGE);
     exit(1);
  }
@@ -652,7 +651,6 @@ int main(int argc, char* argv[]) {
  //if (f_y!=NULL || f_x!=NULL) wCDSonly=true;
  //useBadCDS=useBadCDS || (fgtfok==NULL && fgtfbad==NULL && f_y==NULL && f_x==NULL);
 
- int numfiles = args.startNonOpt();
  //GList<GffObj> gfkept(false,true); //unsorted, free items on delete
  int out_counter=0; //number of records printed
 
