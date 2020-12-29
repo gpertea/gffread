@@ -252,11 +252,6 @@ void setTableFormat(GStr& s) {
     	  tableCols.Add(tcol);
     	  continue;
       }
-      if (w=="geneID" || w=="gene_id") {
-    	  CTableField tcol(ctfGFF_geneID);
-    	  tableCols.Add(tcol);
-    	  continue;
-      }
       if (w=="Parent") {
     	  CTableField tcol(ctfGFF_Parent);
     	  tableCols.Add(tcol);
