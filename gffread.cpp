@@ -4,7 +4,7 @@
 #define __STDC_FORMAT_MACROS
 #include <inttypes.h>
 
-#define VERSION "0.12.4"
+#define VERSION "0.12.5"
 
 #define USAGE "gffread v" VERSION ". Usage:\n\
 gffread [-g <genomic_seqs_fasta> | <dir>] [-s <seq_info.fsize>] \n\
@@ -640,7 +640,7 @@ int main(int argc, char* argv[]) {
  if (f_w!=NULL && args.getOpt("w-nocds"))
 	 wfaNoCDS=true;
 
- if (f_out==NULL && f_w==NULL && f_x==NULL && f_y==NULL && !covInfo)
+ if (f_out==NULL && f_w==NULL && f_x==NULL && f_y==NULL && f_j==NULL && !covInfo)
 	 f_out=stdout;
 
  //if (f_y!=NULL || f_x!=NULL) wCDSonly=true;
