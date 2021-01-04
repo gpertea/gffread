@@ -204,6 +204,7 @@ void TGRange::parseRange(GStr& s) {
 	      this->end=(uint)gsend.asInt();
 	      if (this->end==0) this->end=MAX_UINT;
 	   }
+	   if (this->end<this->start) Gswap(this->start, this->end);
 }
 
 bool tMatch(GffObj& a, GffObj& b) {
@@ -479,12 +480,10 @@ bool GffLoader::checkFilters(GffObj* gffrec) {
 			}
 		}
 	}
-
 	if (this->attrsFilter) { //mostly relevant for transcripts and gene records
 		//remove attributes that are not in attrList
 		gffrec->removeAttrs(attrList);
 	}
-
     if (gffrec->isTranscript()) {    // && TFilters) ?
     	//these filters only apply to transcripts
 		if (multiExon && gffrec->exons.Count()<=1) {
@@ -494,6 +493,28 @@ bool GffLoader::checkFilters(GffObj* gffrec) {
 			return false;
 		}
 		if (wNConly && gffrec->hasCDS()) return false;
+		if (fltJunction!=NULL) {
+			if (gffrec->exons.Count()<=1) return false;
+			if (fltJunction->gseq!=NULL && strcmp(gffrec->getGSeqName(),fltJunction->gseq)!=0) {
+				return false;
+			}
+			if (fltJunction->strand>0 && gffrec->strand!=fltJunction->strand) {
+				return false;
+			}
+			//check coordinates
+			if (gffrec->start>=fltJunction->start || gffrec->end<=fltJunction->end) {
+						return false;
+	        }
+
+			bool noJMatch=true;
+			for (int i=0;i<gffrec->exons.Count()-1;++i) {
+				if (gffrec->exons[i]->end+1==fltJunction->start &&
+						gffrec->exons[i+1]->start-1==fltJunction->end)
+					{ noJMatch=false; break; }
+			}
+			if (noJMatch) return false;
+		}
+
 		return process_transcript(gfasta, *gffrec);
     } //transcript filters check
 	return true;
