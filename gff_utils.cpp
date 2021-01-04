@@ -42,10 +42,15 @@ bool fullCDSonly=false; // starts with START, ends with STOP codon
 bool multiExon=false;
 bool writeExonSegs=false;
 char* tracklabel=NULL;
+/*
 char* rfltGSeq=NULL;
 char rfltStrand=0;
 uint rfltStart=0;
-uint rfltEnd=MAX_UINT;
+uint rfltEnd=MAX_UINT;*/
+TGRange* fltRange=NULL;
+
+TGRange* fltJunction=NULL;
+
 bool rfltWithin=false; //check for full containment within given range
 bool addDescr=false;
 
@@ -166,6 +171,40 @@ int cmpRedundant(GffObj& a, GffObj& b) {
    else return (a.exons.Count()>b.exons.Count())? 1: -1;
 }
 
+
+void TGRange::parseRange(GStr& s) {
+	   this->start=0;
+	   this->end=MAX_UINT;
+	   s.trim();
+	   if (s[0]=='+' || s[0]=='-') {
+	     strand=s[0];
+	     s.cut(0,1);
+	     }
+	   int isep=s.index(':');
+	   if (isep>0) { //gseq name given
+	      if (strand==0 && (s[isep-1]=='+' || s[isep-1]=='-')) {
+	        isep--;
+	        strand=s[isep];
+	        s.cut(isep,1);
+	        }
+	      if (isep>0)
+	          this->gseq=Gstrdup((s.substr(0,isep)).chars());
+	      s.cut(0,isep+1);
+	      }
+	   GStr gsend;
+	   char slast=s[s.length()-1];
+	   if (strand==0 && (slast=='+' || slast=='-')) {
+	      s.chomp(slast);
+	      strand=slast;
+	      }
+	   if (s.index("..")>=0) gsend=s.split("..");
+	                    else gsend=s.split('-');
+	   if (!s.is_empty()) this->start=(uint)s.asInt();
+	   if (!gsend.is_empty()) {
+	      this->end=(uint)gsend.asInt();
+	      if (this->end==0) this->end=MAX_UINT;
+	   }
+}
 
 bool tMatch(GffObj& a, GffObj& b) {
   //strict intron chain match, or single-exon perfect match
@@ -419,27 +458,28 @@ bool GffLoader::checkFilters(GffObj* gffrec) {
 					gffrec->getID(), minLen);
     	return false;
 	}
-	if (rfltGSeq!=NULL) { //filter by gseqName
-		if (strcmp(gffrec->getGSeqName(),rfltGSeq)!=0) {
+	if (fltRange!=NULL) { //filter by gseqName
+		if (fltRange->gseq!=NULL && strcmp(gffrec->getGSeqName(),fltRange->gseq)!=0) {
 			return false;
 		}
-	}
-	if (rfltStrand>0 && gffrec->strand !=rfltStrand) {
-		return false;
-	}
-	//check coordinates
-	if (rfltStart!=0 || rfltEnd!=MAX_UINT) {
-		if (rfltWithin) {
-			if (gffrec->start<rfltStart || gffrec->end>rfltEnd) {
-				return false; //not within query range
+		if (fltRange->strand>0 && gffrec->strand!=fltRange->strand) {
+			return false;
+		}
+		//check coordinates
+		if (fltRange->start!=0 || fltRange->end!=MAX_UINT) {
+			if (rfltWithin) {
+				if (gffrec->start<fltRange->start || gffrec->end>fltRange->end) {
+					return false; //not within query range
+				}
+			}
+			else {
+				if (gffrec->start>fltRange->end || gffrec->end<fltRange->start) {
+					return false;
+				}
 			}
 		}
-		else {
-			if (gffrec->start>rfltEnd || gffrec->end<rfltStart) {
-				return false;
-			}
-		}
 	}
+
 	if (this->attrsFilter) { //mostly relevant for transcripts and gene records
 		//remove attributes that are not in attrList
 		gffrec->removeAttrs(attrList);

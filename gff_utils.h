@@ -56,10 +56,6 @@ extern bool fullCDSonly; // starts with START, ends with STOP codon
 extern bool multiExon;
 extern bool writeExonSegs;
 extern char* tracklabel;
-extern char* rfltGSeq;
-extern char rfltStrand;
-extern uint rfltStart;
-extern uint rfltEnd;
 extern bool rfltWithin; //check for full containment within given range
 extern bool addDescr;
 
@@ -93,6 +89,27 @@ typedef bool GFValidateFunc(GffObj* gf);
 #define T_OSTRAND(d) (d & 0xFF)
 //keep/set original/old strand
 #define T_SET_OSTRAND(d, s) d |= s
+
+/*extern char* rfltGSeq;
+extern char rfltStrand;
+extern uint rfltStart;
+extern uint rfltEnd;*/
+
+struct TGRange: GSeg {
+	char* gseq=NULL;
+	int gseq_id=-1;
+	char strand=0;
+	void parseRange(GStr& s);
+
+	~TGRange() {
+		GFREE(gseq);
+	}
+};
+
+extern TGRange* fltRange;
+
+extern TGRange* fltJunction;
+
 
 class SeqInfo { //populated from the -s option of gffread
  public:

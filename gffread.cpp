@@ -8,9 +8,10 @@
 
 #define USAGE "gffread v" VERSION ". Usage:\n\
 gffread [-g <genomic_seqs_fasta> | <dir>] [-s <seq_info.fsize>] \n\
- [-o <outfile>] [-t <trackname>] [-r [[<strand>]<chr>:]<start>..<end> [-R]]\n\
+ [-o <outfile>] [-t <trackname>] [-r [<strand>]<chr>:<start>-<end> [-R]]\n\
+ [--jmatch <chr>:<start>-<end>] [--no-pseudo] \n\
  [-CTVNJMKQAFPGUBHZWTOLE] [-w <exons.fa>] [-x <cds.fa>] [-y <tr_cds.fa>]\n\
- [--ids <IDs.lst> | --nids <IDs.lst>] [--attrs <attr-list>] [-i <maxintron>]\n\
+ [-j ][--ids <IDs.lst> | --nids <IDs.lst>] [--attrs <attr-list>] [-i <maxintron>]\n\
  [--stream] [--bed | --gtf | --tlf] [--table <attrlist>] [--sort-by <ref.lst>]\n\
  [<input_gff>] \n\n\
  Filter, convert or cluster GFF/GTF/BED records, extract the sequence of\n\
@@ -20,14 +21,15 @@ gffread [-g <genomic_seqs_fasta> | <dir>] [-s <seq_info.fsize>] \n\
  the basic attributes.\n\
  \n\
 Options:\n\
- -i   discard transcripts having an intron larger than <maxintron>\n\
  --ids discard records/transcripts if their IDs are not listed in <IDs.lst>\n\
  --nids discard records/transcripts if their IDs are listed in <IDs.lst>\n\
+ -i   discard transcripts having an intron larger than <maxintron>\n\
  -l   discard transcripts shorter than <minlen> bases\n\
  -r   only show transcripts overlapping coordinate range <start>..<end>\n\
       (on chromosome/contig <chr>, strand <strand> if provided)\n\
  -R   for -r option, discard all transcripts that are not fully \n\
       contained within the given range\n\
+ --jmatch only output transcripts matching the given junction\n\
  -U   discard single-exon transcripts\n\
  -C   coding only: discard mRNAs that have no CDS features\n\
  --nc non-coding only: discard mRNAs that have CDS features\n\
@@ -105,7 +107,7 @@ Output options:\n\
  -g   full path to a multi-fasta file with the genomic sequences\n\
       for all input mappings, OR a directory with single-fasta files\n\
       (one per genomic sequence, with file names matching sequence names)\n\
- -j    write a tab delimited file with all the junctions (intron coordinates)\n\
+ -j    output the junctions and the corresponding transcripts\n\
  -w    write a fasta file with spliced exons for each transcript\n\
  --w-add <N> for the -w option, extract additional <N> bases\n\
        both upstream and downstream of the transcript boundaries\n\
@@ -387,7 +389,8 @@ void shutDown() {
 	seqinfo.Clear();
 	//if (faseq!=NULL) delete faseq;
 	//if (gcdb!=NULL) delete gcdb;
-	GFREE(rfltGSeq);
+	GFREE(fltRange);
+	GFREE(fltJunction);
 	FWCLOSE(f_out);
 	FWCLOSE(f_w);
 	FWCLOSE(f_x);
@@ -398,7 +401,7 @@ void shutDown() {
 int main(int argc, char* argv[]) {
  GArgs args(argc, argv,
    "version;debug;merge;stream;adj-stop;bed;in-bed;tlf;in-tlf;cluster-only;nc;cov-info;help;"
-    "sort-alpha;keep-genes;w-nocds;attrs=;w-add=;ids=;nids=0;gtf;keep-comments;keep-exon-attrs;force-exons;t-adopt;gene2exon;"
+    "sort-alpha;keep-genes;w-nocds;attrs=;w-add=;ids=;nids=;jmatch=;gtf;keep-comments;keep-exon-attrs;force-exons;t-adopt;gene2exon;"
     "ignore-locus;no-pseudo;table=sort-by=hvOUNHPWCVJMKQYTDARSZFGLEBm:g:i:r:s:l:t:o:w:x:y:j:d:");
  args.printError(USAGE, true);
  int numfiles = args.startNonOpt();
@@ -555,42 +558,21 @@ int main(int argc, char* argv[]) {
  rfltWithin=(args.getOpt('R')!=NULL);
  s=args.getOpt('r');
  if (!s.is_empty()) {
-   s.trim();
-   if (s[0]=='+' || s[0]=='-') {
-     rfltStrand=s[0];
-     s.cut(0,1);
-     }
-   int isep=s.index(':');
-   if (isep>0) { //gseq name given
-      if (rfltStrand==0 && (s[isep-1]=='+' || s[isep-1]=='-')) {
-        isep--;
-        rfltStrand=s[isep];
-        s.cut(isep,1);
-        }
-      if (isep>0)
-          rfltGSeq=Gstrdup((s.substr(0,isep)).chars());
-      s.cut(0,isep+1);
-      }
-   GStr gsend;
-   char slast=s[s.length()-1];
-   if (rfltStrand==0 && (slast=='+' || slast=='-')) {
-      s.chomp(slast);
-      rfltStrand=slast;
-      }
-   if (s.index("..")>=0) gsend=s.split("..");
-                    else gsend=s.split('-');
-   if (!s.is_empty()) rfltStart=(uint)s.asInt();
-   if (!gsend.is_empty()) {
-      rfltEnd=(uint)gsend.asInt();
-      if (rfltEnd==0) rfltEnd=MAX_UINT;
-      }
-   } //gseq/range filtering
+	fltRange=new TGRange();
+	fltRange->parseRange(s);
+ } //gseq/range filtering
  else {
    if (rfltWithin)
      GError("Error: option -R requires -r!\n");
    //if (rfltWholeTranscript)
    //  GError("Error: option -P requires -r!\n");
-   }
+ }
+ s=args.getOpt("jmatch");
+ if (!s.is_empty()) {
+	fltJunction=new TGRange();
+	fltJunction->parseRange(s);
+ } //gseq/range filtering
+
  s=args.getOpt('m');
  if (!s.is_empty()) {
    FILE* ft=fopen(s,"r");
