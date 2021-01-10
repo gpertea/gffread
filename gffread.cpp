@@ -112,7 +112,7 @@ Output options:\n\
  --w-nocds for -w, disable the output of CDS info in the FASTA file\n\
  -x    write a fasta file with spliced CDS for each GFF transcript\n\
  -y    write a protein fasta file with the translation of CDS for each record\n\
- -W    for -w and -x options, write in the FASTA defline all the exon\n\
+ -W    for -w, -x and -y options, write in the FASTA defline all the exon\n\
        coordinates projected onto the spliced sequence;\n\
  -S    for -y option, use '*' instead of '.' as stop codon translation\n\
  -L    Ensembl GTF to GFF3 conversion, adds version to IDs\n\

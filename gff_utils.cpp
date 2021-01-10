@@ -680,37 +680,37 @@ bool process_transcript(GFastaDb& gfasta, GffObj& gffrec) {
   if (adjstop!=NULL) delete adjstop;
   */
   if (cdsnt!=NULL) { // && !inframeStop) {
+	  GStr defline(gffrec.getID(), 94);
+	  if (writeExonSegs) {
+		  defline.append(" loc:");
+		  defline.append(gffrec.getGSeqName());
+		  defline.appendfmt("(%c)",gffrec.strand);
+		  //warning: not CDS coordinates are written here, but the exon ones
+		  defline+=(int)gffrec.start;
+		  defline+=(char)'-';
+		  defline+=(int)gffrec.end;
+		  // -- here these are CDS substring coordinates on the spliced sequence:
+		  defline.append(" segs:");
+		  for (int i=0;i<seglst.Count();i++) {
+			  if (i>0) defline.append(",");
+			  defline+=(int)seglst[i].start;
+			  defline.append("-");
+			  defline+=(int)seglst[i].end;
+		  }
+	  }
 	  if (f_y!=NULL) { //CDS translation fasta output requested
 			 if (cdsaa==NULL) { //translate now if not done before
 			   cdsaa=translateDNA(cdsnt, aalen, seqlen);
 			 }
 			 if (aalen>0) {
 			   if (cdsaa[aalen-1]=='.' || cdsaa[aalen-1]=='\0') --aalen; //avoid printing the stop codon
- 			   fprintf(f_y, ">%s", gffrec.getID());
+ 			   fprintf(f_y, ">%s", defline.chars());
  			   if (fmtTable) printTableData(f_y, gffrec, true);
  			   else fprintf(f_y, "\n");
 			   printFasta(f_y, NULL, cdsaa, aalen, StarStop);
 			 }
 	  }
 	  if (f_x!=NULL) { //CDS only
-			 GStr defline(gffrec.getID(), 94);
-			 if (writeExonSegs) {
-				  defline.append(" loc:");
-				  defline.append(gffrec.getGSeqName());
-				  defline.appendfmt("(%c)",gffrec.strand);
-				  //warning: not CDS coordinates are written here, but the exon ones
-				  defline+=(int)gffrec.start;
-				  defline+=(char)'-';
-				  defline+=(int)gffrec.end;
-				  // -- here these are CDS substring coordinates on the spliced sequence:
-				  defline.append(" segs:");
-				  for (int i=0;i<seglst.Count();i++) {
-					  if (i>0) defline.append(",");
-					  defline+=(int)seglst[i].start;
-					  defline.append("-");
-					  defline+=(int)seglst[i].end;
-					  }
-			 }
 			 fprintf(f_x, ">%s", defline.chars());
 			 if (fmtTable) printTableData(f_x, gffrec, true);
 			 else fprintf(f_x, "\n");
