@@ -322,6 +322,8 @@ int adjust_stopcodon(GffObj& gffrec, int adj, GList<GSeg>* seglst) {
 
 void printTableData(FILE* f, GffObj& g, bool inFasta) {
  //using attribute list in tableCols
+	const int DBUF_LEN=1024; //there should not be attribute values larger than 1K!
+	char dbuf[DBUF_LEN];
 	char* av=NULL;
 	for(int i=0;i<tableCols.Count();i++) {
 		if (i>0 || inFasta) {
@@ -331,7 +333,12 @@ void printTableData(FILE* f, GffObj& g, bool inFasta) {
 		switch(tableCols[i].type) {
 		case ctfGFF_Attr:
 			av=g.getAttr(tableCols[i].name.chars());
-			fprintf(f,"%s",av!=NULL? av : ".");
+			if (av) {
+				if (decodeChars) {
+					GffObj::decodeHexChars(dbuf, av, DBUF_LEN-1);
+					fprintf(f,"%s", dbuf);
+				} else fprintf(f,"%s",av);
+			} else fprintf(f,".");
 			break;
 		case ctfGFF_chr:
 			fprintf(f,"%s",g.getGSeqName());
