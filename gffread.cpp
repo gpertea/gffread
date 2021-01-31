@@ -4,7 +4,7 @@
 #define __STDC_FORMAT_MACROS
 #include <inttypes.h>
 
-#define VERSION "0.12.5"
+#define VERSION "0.12.6"
 
 #define USAGE "gffread v" VERSION ". Usage:\n\
 gffread [-g <genomic_seqs_fasta> | <dir>] [-s <seq_info.fsize>] \n\
@@ -405,7 +405,7 @@ int main(int argc, char* argv[]) {
     "ignore-locus;no-pseudo;table=sort-by=hvOUNHPWCVJMKQYTDARSZFGLEBm:g:i:r:s:l:t:o:w:x:y:j:d:");
  args.printError(USAGE, true);
  int numfiles = args.startNonOpt();
- if (args.getOpt('h') || args.getOpt("help") || ( numfiles==0 && !hasStdInput())) {
+ if (args.getOpt('h') || args.getOpt("help") || ( numfiles==0 && !haveStdInput())) {
     GMessage("%s",USAGE);
     exit(1);
  }
@@ -556,21 +556,17 @@ int main(int argc, char* argv[]) {
 	 gffloader.fullAttributes=true;
  }
  rfltWithin=(args.getOpt('R')!=NULL);
- s=args.getOpt('r');
- if (!s.is_empty()) {
-	fltRange=new TGRange();
-	fltRange->parseRange(s);
- } //gseq/range filtering
+ char* sz=args.getOpt('r');
+ if (sz)
+	fltRange=new GRangeParser(sz);
  else {
    if (rfltWithin)
      GError("Error: option -R requires -r!\n");
-   //if (rfltWholeTranscript)
-   //  GError("Error: option -P requires -r!\n");
  }
- s=args.getOpt("jmatch");
- if (!s.is_empty()) {
-	fltJunction=new TGRange();
-	fltJunction->parseRange(s);
+ sz=args.getOpt("jmatch");
+ if (sz) {
+	//TODO: check if there is a file
+	fltJunction=new GRangeParser(sz);
  } //gseq/range filtering
 
  s=args.getOpt('m');

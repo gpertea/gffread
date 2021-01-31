@@ -47,9 +47,9 @@ char* rfltGSeq=NULL;
 char rfltStrand=0;
 uint rfltStart=0;
 uint rfltEnd=MAX_UINT;*/
-TGRange* fltRange=NULL;
+GRangeParser* fltRange=NULL;
 
-TGRange* fltJunction=NULL;
+GRangeParser* fltJunction=NULL;
 
 bool rfltWithin=false; //check for full containment within given range
 bool addDescr=false;
@@ -169,42 +169,6 @@ int cmpRedundant(GffObj& a, GffObj& b) {
      else return (a.covlen>b.covlen)? 1 : -1;
      }
    else return (a.exons.Count()>b.exons.Count())? 1: -1;
-}
-
-
-void TGRange::parseRange(GStr& s) {
-	   this->start=0;
-	   this->end=MAX_UINT;
-	   s.trim();
-	   if (s[0]=='+' || s[0]=='-') {
-	     strand=s[0];
-	     s.cut(0,1);
-	     }
-	   int isep=s.index(':');
-	   if (isep>0) { //gseq name given
-	      if (strand==0 && (s[isep-1]=='+' || s[isep-1]=='-')) {
-	        isep--;
-	        strand=s[isep];
-	        s.cut(isep,1);
-	        }
-	      if (isep>0)
-	          this->gseq=Gstrdup((s.substr(0,isep)).chars());
-	      s.cut(0,isep+1);
-	      }
-	   GStr gsend;
-	   char slast=s[s.length()-1];
-	   if (strand==0 && (slast=='+' || slast=='-')) {
-	      s.chomp(slast);
-	      strand=slast;
-	      }
-	   if (s.index("..")>=0) gsend=s.split("..");
-	                    else gsend=s.split('-');
-	   if (!s.is_empty()) this->start=(uint)s.asInt();
-	   if (!gsend.is_empty()) {
-	      this->end=(uint)gsend.asInt();
-	      if (this->end==0) this->end=MAX_UINT;
-	   }
-	   if (this->end<this->start) Gswap(this->start, this->end);
 }
 
 bool tMatch(GffObj& a, GffObj& b) {
@@ -467,7 +431,7 @@ bool GffLoader::checkFilters(GffObj* gffrec) {
     	return false;
 	}
 	if (fltRange!=NULL) { //filter by gseqName
-		if (fltRange->gseq!=NULL && strcmp(gffrec->getGSeqName(),fltRange->gseq)!=0) {
+		if (fltRange->refName!=NULL && strcmp(gffrec->getGSeqName(),fltRange->refName)!=0) {
 			return false;
 		}
 		if (fltRange->strand>0 && gffrec->strand!=fltRange->strand) {
@@ -502,7 +466,7 @@ bool GffLoader::checkFilters(GffObj* gffrec) {
 		if (wNConly && gffrec->hasCDS()) return false;
 		if (fltJunction!=NULL) {
 			if (gffrec->exons.Count()<=1) return false;
-			if (fltJunction->gseq!=NULL && strcmp(gffrec->getGSeqName(),fltJunction->gseq)!=0) {
+			if (fltJunction->refName!=NULL && strcmp(gffrec->getGSeqName(),fltJunction->refName)!=0) {
 				return false;
 			}
 			if (fltJunction->strand>0 && gffrec->strand!=fltJunction->strand) {
@@ -527,7 +491,7 @@ bool GffLoader::checkFilters(GffObj* gffrec) {
 	return true;
 }
 
-bool process_transcript(GFastaDb& gfasta, GffObj& gffrec) {
+bool GffLoader::process_transcript(GFastaDb& gfasta, GffObj& gffrec) {
  if (!gffrec.isTranscript()) return false; //shouldn't call this function unless it's a transcript
  //returns true if the transcript passed the filter
  char* gname=gffrec.getGeneName();
@@ -756,7 +720,10 @@ bool process_transcript(GFastaDb& gfasta, GffObj& gffrec) {
 			   if (cdsaa[aalen-1]=='.' || cdsaa[aalen-1]=='\0') --aalen; //avoid printing the stop codon
  			   fprintf(f_y, ">%s", gffrec.getID());
  			   if (fmtTable) printTableData(f_y, gffrec, true);
- 			   else fprintf(f_y, "\n");
+ 			   else {
+ 				  gffrec.printAttrs(f_y, ";", false, decodeChars);
+ 				  fprintf(f_y, "\n");
+ 			   }
 			   printFasta(f_y, NULL, cdsaa, aalen, StarStop);
 			 }
 	  }
@@ -781,7 +748,10 @@ bool process_transcript(GFastaDb& gfasta, GffObj& gffrec) {
 			 }
 			 fprintf(f_x, ">%s", defline.chars());
 			 if (fmtTable) printTableData(f_x, gffrec, true);
-			 else fprintf(f_x, "\n");
+			 else {
+				 gffrec.printAttrs(f_x, ";", false, decodeChars);
+				 fprintf(f_x, "\n");
+			 }
 			 printFasta(f_x, NULL, cdsnt, seqlen);
 	  }
 	  GFREE(cdsnt);
@@ -843,7 +813,10 @@ bool process_transcript(GFastaDb& gfasta, GffObj& gffrec) {
 
 		  fprintf(f_w, ">%s", defline.chars());
 		  if (fmtTable) printTableData(f_w, gffrec, true);
-		    else fprintf(f_w, "\n");
+		    else {
+                gffrec.printAttrs(f_w, ";", false, decodeChars);
+		    	fprintf(f_w, "\n");
+		    }
 		  printFasta(f_w, NULL, exont, seqlen);
 		  GFREE(exont);
 	  }
@@ -860,8 +833,6 @@ GTData::GTData(GffObj* t, GenomicSeqData* gd):rna(t),gdata(gd), locus(NULL), rep
     if (gdata!=NULL)
  	   gdata->tdata.Add(this);
 }
-
-
 
 bool GffLoader::unsplContained(GffObj& ti, GffObj&  tj) {
  //returns true only if ti (which MUST be single-exon) is "almost" contained in any of tj's exons

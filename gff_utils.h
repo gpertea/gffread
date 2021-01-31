@@ -19,7 +19,6 @@ extern FILE* f_y; //wrting fasta with translated CDS
 
 extern FILE* f_j; //wrting junctions (introns)
 
-
 extern bool TFilters;
 
 extern bool wfaNoCDS;
@@ -90,26 +89,9 @@ typedef bool GFValidateFunc(GffObj* gf);
 //keep/set original/old strand
 #define T_SET_OSTRAND(d, s) d |= s
 
-/*extern char* rfltGSeq;
-extern char rfltStrand;
-extern uint rfltStart;
-extern uint rfltEnd;*/
+extern GRangeParser* fltRange;
 
-struct TGRange: GSeg {
-	char* gseq=NULL;
-	int gseq_id=-1;
-	char strand=0;
-	void parseRange(GStr& s);
-
-	~TGRange() {
-		GFREE(gseq);
-	}
-};
-
-extern TGRange* fltRange;
-
-extern TGRange* fltJunction;
-
+extern GRangeParser* fltJunction;
 
 class SeqInfo { //populated from the -s option of gffread
  public:
@@ -146,7 +128,6 @@ char* getSeqDescr(char* seqid);
 char* getSeqName(char* seqid);
 int adjust_stopcodon(GffObj& gffrec, int adj, GList<GSeg>* seglst=NULL);
 void printTableData(FILE* f, GffObj& g, bool inFasta=false);
-bool process_transcript(GFastaDb& gfasta, GffObj& gffrec);
 
 enum ETableFieldType {
   ctfGFF_Attr=0, // attribute name as is
@@ -820,6 +801,8 @@ class GffLoader {
   }
 
   bool validateGffRec(GffObj* gffrec);
+  bool process_transcript(GFastaDb& gfasta, GffObj& gffrec);
+
   bool checkFilters(GffObj* gffrec);
 
   void collectIntrons(GffObj& t); //for -j output
