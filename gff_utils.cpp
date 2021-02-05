@@ -438,7 +438,7 @@ bool GffLoader::checkFilters(GffObj* gffrec) {
 			return false;
 		}
 		//check coordinates
-		if (fltRange->start!=0 || fltRange->end!=MAX_UINT) {
+		if (fltRange->start || fltRange->end<UINT_MAX) {
 			if (rfltWithin) {
 				if (gffrec->start<fltRange->start || gffrec->end>fltRange->end) {
 					return false; //not within query range
@@ -469,19 +469,31 @@ bool GffLoader::checkFilters(GffObj* gffrec) {
 			if (fltJunction->refName!=NULL && strcmp(gffrec->getGSeqName(),fltJunction->refName)!=0) {
 				return false;
 			}
-			if (fltJunction->strand>0 && gffrec->strand!=fltJunction->strand) {
+			if (fltJunction->strand && gffrec->strand!=fltJunction->strand) {
 				return false;
 			}
 			//check coordinates
-			if (gffrec->start>=fltJunction->start || gffrec->end<=fltJunction->end) {
+			uint jstart=fltJunction->start;
+			uint jend=fltJunction->end;
+			if (jstart==0) jstart=jend;
+			if (jend==0)  jend=jstart;
+			if (gffrec->start>=jstart || gffrec->end<=jend) {
 						return false;
 	        }
 
 			bool noJMatch=true;
 			for (int i=0;i<gffrec->exons.Count()-1;++i) {
-				if (gffrec->exons[i]->end+1==fltJunction->start &&
-						gffrec->exons[i+1]->start-1==fltJunction->end)
-					{ noJMatch=false; break; }
+				if (fltJunction->start && fltJunction->end) {
+					if (gffrec->exons[i]->end+1==fltJunction->start &&
+							gffrec->exons[i+1]->start-1==fltJunction->end)
+						{ noJMatch=false; break; }
+				} else if (fltJunction->start) { //end match not required
+					if (gffrec->exons[i]->end+1==fltJunction->start)
+						{ noJMatch=false; break; }
+				} else { //only end match required:
+					if (gffrec->exons[i+1]->start-1==fltJunction->end)
+						{ noJMatch=false; break; }
+				}
 			}
 			if (noJMatch) return false;
 		}
@@ -721,6 +733,7 @@ bool GffLoader::process_transcript(GFastaDb& gfasta, GffObj& gffrec) {
  			   fprintf(f_y, ">%s", gffrec.getID());
  			   if (fmtTable) printTableData(f_y, gffrec, true);
  			   else {
+ 				  if (gffrec.attrs!=NULL && gffrec.attrs->Count()>0) fprintf(f_y," ");
  				  gffrec.printAttrs(f_y, ";", false, decodeChars);
  				  fprintf(f_y, "\n");
  			   }
@@ -749,6 +762,7 @@ bool GffLoader::process_transcript(GFastaDb& gfasta, GffObj& gffrec) {
 			 fprintf(f_x, ">%s", defline.chars());
 			 if (fmtTable) printTableData(f_x, gffrec, true);
 			 else {
+				 if (gffrec.attrs!=NULL && gffrec.attrs->Count()>0) fprintf(f_x," ");
 				 gffrec.printAttrs(f_x, ";", false, decodeChars);
 				 fprintf(f_x, "\n");
 			 }
@@ -814,7 +828,8 @@ bool GffLoader::process_transcript(GFastaDb& gfasta, GffObj& gffrec) {
 		  fprintf(f_w, ">%s", defline.chars());
 		  if (fmtTable) printTableData(f_w, gffrec, true);
 		    else {
-                gffrec.printAttrs(f_w, ";", false, decodeChars);
+		    	if (gffrec.attrs!=NULL && gffrec.attrs->Count()>0) fprintf(f_w," ");
+		    	gffrec.printAttrs(f_w, ";", false, decodeChars);
 		    	fprintf(f_w, "\n");
 		    }
 		  printFasta(f_w, NULL, exont, seqlen);

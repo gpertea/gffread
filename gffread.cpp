@@ -389,8 +389,8 @@ void shutDown() {
 	seqinfo.Clear();
 	//if (faseq!=NULL) delete faseq;
 	//if (gcdb!=NULL) delete gcdb;
-	GFREE(fltRange);
-	GFREE(fltJunction);
+	delete fltRange;
+	delete fltJunction;
 	FWCLOSE(f_out);
 	FWCLOSE(f_w);
 	FWCLOSE(f_x);
@@ -557,16 +557,19 @@ int main(int argc, char* argv[]) {
  }
  rfltWithin=(args.getOpt('R')!=NULL);
  char* sz=args.getOpt('r');
- if (sz)
+ if (sz) {
 	fltRange=new GRangeParser(sz);
- else {
+ 	if (fltRange->end==0) //end coordinate not given
+ 		fltRange->end=UINT_MAX;
+ } else {
    if (rfltWithin)
      GError("Error: option -R requires -r!\n");
  }
  sz=args.getOpt("jmatch");
  if (sz) {
-	//TODO: check if there is a file
+	//TODO: check if this is a file?
 	fltJunction=new GRangeParser(sz);
+	if (fltJunction->strand=='.') fltJunction->strand=0;
  } //gseq/range filtering
 
  s=args.getOpt('m');
