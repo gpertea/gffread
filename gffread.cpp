@@ -405,6 +405,10 @@ int main(int argc, char* argv[]) {
     "ignore-locus;no-pseudo;table=sort-by=hvOUNHPWCVJMKQYTDARSZFGLEBm:g:i:r:s:l:t:o:w:x:y:j:d:");
  args.printError(USAGE, true);
  int numfiles = args.startNonOpt();
+ if (args.getOpt("version")) {
+    printf(VERSION"\n");
+    exit(0);
+ }
  if (args.getOpt('h') || args.getOpt("help") || ( numfiles==0 && !haveStdInput())) {
     GMessage("%s",USAGE);
     exit(1);
@@ -489,10 +493,6 @@ int main(int argc, char* argv[]) {
      fprintf(stderr, "Command line was:\n");
      args.printCmdLine(stderr);
      }
- if (args.getOpt("version")) {
-  printf(VERSION"\n");
-  exit(0);
- }
  gffloader.fullAttributes=(args.getOpt('F')!=NULL);
  gffloader.keep_AllExonAttrs=(args.getOpt("keep-exon-attrs")!=NULL);
  if (gffloader.keep_AllExonAttrs && !gffloader.fullAttributes) {
