@@ -752,7 +752,7 @@ bool GffLoader::process_transcript(GFastaDb& gfasta, GffObj& gffrec) {
  			   if (fmtTable) printTableData(f_y, gffrec, true);
  			   else {
  				  if (gffrec.attrs!=NULL && gffrec.attrs->Count()>0) fprintf(f_y," ");
- 				  gffrec.printAttrs(f_y, ";", false, decodeChars);
+ 				  gffrec.printAttrs(f_y, ";", false, decodeChars, false);
  				  fprintf(f_y, "\n");
  			   }
 			   printFasta(f_y, NULL, cdsaa, aalen, StarStop);
@@ -763,7 +763,7 @@ bool GffLoader::process_transcript(GFastaDb& gfasta, GffObj& gffrec) {
 			 if (fmtTable) printTableData(f_x, gffrec, true);
 			 else {
 				 if (gffrec.attrs!=NULL && gffrec.attrs->Count()>0) fprintf(f_x," ");
-				 gffrec.printAttrs(f_x, ";", false, decodeChars);
+				 gffrec.printAttrs(f_x, ";", false, decodeChars, false);
 				 fprintf(f_x, "\n");
 			 }
 			 printFasta(f_x, NULL, cdsnt, seqlen);
@@ -829,7 +829,7 @@ bool GffLoader::process_transcript(GFastaDb& gfasta, GffObj& gffrec) {
 		  if (fmtTable) printTableData(f_w, gffrec, true);
 		    else {
 		    	if (gffrec.attrs!=NULL && gffrec.attrs->Count()>0) fprintf(f_w," ");
-		    	gffrec.printAttrs(f_w, ";", false, decodeChars);
+		    	gffrec.printAttrs(f_w, ";", false, decodeChars, false);
 		    	fprintf(f_w, "\n");
 		    }
 		  printFasta(f_w, NULL, exont, seqlen);
