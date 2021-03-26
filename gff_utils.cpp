@@ -386,7 +386,9 @@ bool GffLoader::validateGffRec(GffObj* gffrec) {
 				   }
 			   }
 			}
+		return false;
 		}
+		if (gffrec->isGene() && keepGenes) return true;
 		return false;
 	} //transcript rejected
 	return true;
