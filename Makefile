@@ -9,9 +9,9 @@ LINKER  := $(if $(LINKER),$(LINKER),g++)
 
 LDFLAGS := $(if $(LDFLAGS),$(LDFLAGS),-g)
 
-BASEFLAGS  := -Wall -Wextra ${SEARCHDIRS} -D_FILE_OFFSET_BITS=64 \
--D_LARGEFILE_SOURCE -D_REENTRANT -fno-strict-aliasing \
- -std=c++11 -fno-exceptions -fno-rtti
+BASEFLAGS  := -Wall -Wextra -std=c++11 ${SEARCHDIRS} -D_FILE_OFFSET_BITS=64 \
+ -D_LARGEFILE_SOURCE -D_REENTRANT -fno-strict-aliasing \
+ -fno-exceptions -fno-rtti
 
 GCCV8 := $(shell expr `${CXX} -dumpversion | cut -f1 -d.` \>= 8)
 ifeq "$(GCCV8)" "1"
@@ -22,8 +22,12 @@ CXXFLAGS := $(if $(CXXFLAGS),$(BASEFLAGS) $(CXXFLAGS),$(BASEFLAGS))
 
 ifneq (,$(filter %release %static, $(MAKECMDGOALS)))
   # -- release build
-  CXXFLAGS := -g -O3 -DNDEBUG $(CXXFLAGS)
-else
+  LIBS := 
+  ifneq (,$(findstring static,$(MAKECMDGOALS)))
+    LDFLAGS += -static-libstdc++ -static-libgcc
+  endif
+  CXXFLAGS := -O3 -DNDEBUG $(CXXFLAGS)
+else #debug builds
   ifneq (,$(filter %profile %gprof %prof, $(MAKECMDGOALS)))
     CXXFLAGS += -pg -O0 -DNDEBUG
     LDFLAGS += -pg
@@ -75,7 +79,7 @@ OBJS := ${GCLDIR}/GBase.o ${GCLDIR}/GArgs.o ${GCLDIR}/GFaSeqGet.o \
  
 .PHONY : all
 
-all release debug memcheck memdebug profile gprof prof: ../gclib gffread
+all static release debug memcheck memdebug profile gprof prof: ../gclib gffread
 
 ../gclib:
 	git clone https://github.com/gpertea/gclib.git ../gclib
