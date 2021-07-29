@@ -4,7 +4,7 @@
 #define __STDC_FORMAT_MACROS
 #include <inttypes.h>
 
-#define VERSION "0.12.7"
+#define VERSION "0.13.1"
 
 #define USAGE "gffread v" VERSION ". Usage:\n\
 gffread [-g <genomic_seqs_fasta> | <dir>] [-s <seq_info.fsize>] \n\
@@ -143,7 +143,7 @@ Output options:\n\
        problems with the given GFF/GTF records\n\
 "
 
-GStr sortBy; //file name with chromosomes listed in the desired order
+Gcstr sortBy; //file name with chromosomes listed in the desired order
 
 bool BEDinput=false;
 bool TLFinput=false;
@@ -164,11 +164,9 @@ void loadIDlist(FILE* f, GStrSet<> & idhash) {
       if (line==NULL) break;
       if (line[0]=='#') continue; //skip comments
       GDynArray<char*> ids;
-      strsplit(line, ids);
-      for (uint i=0;i<ids.Count();i++) {
-    	  if (strlen(ids[i])>0)
-    		  idhash.Add(ids[i]);
-      }
+      strSpcSplit(line, ids); //could be multiple ids per line
+      for (uint i=0;i<ids.Count();i++)
+    	  idhash.Add(ids[i]);
   }
 }
 
@@ -202,17 +200,15 @@ void loadSeqInfo(FILE* f, GHash<SeqInfo*> &si) {
       } //while lines
 }
 
-void getAttrList(GStr& s) {
+void getAttrList(Gcstr& s) {
 	 if (s.is_empty()) return;
-	 s.startTokenize(",;:", tkCharSet);
-	 GStr w;
-	 while (s.nextToken(w)) {
-		  if (w.length()>0)
-    	    attrList.Add(w.chars());
-	 }
+	 GDynArray<char*> tokens;
+	 strSplitTokens(s(), tokens, ".,;:");
+	 for (uint i=0;i<tokens.Count();++i)
+    	    attrList.Add(tokens[i]);
 }
 
-void setTableFormat(GStr& s) {
+void setTableFormat(Gcstr& s) {
 	 if (s.is_empty()) return;
 	 GHash<ETableFieldType> specialFields;
 	 specialFields.Add("chr", ctfGFF_chr);
@@ -229,10 +225,10 @@ void setTableFormat(GStr& s) {
 	 specialFields.Add("cds", ctfGFF_cds);
 	 specialFields.Add("covlen", ctfGFF_covlen);
 	 specialFields.Add("cdslen", ctfGFF_cdslen);
-
-	 s.startTokenize(" ,;.:", tkCharSet);
-	 GStr w;
-	 while (s.nextToken(w)) {
+	 GDynArray<char*> tokens;
+	 strSplitTokens(s(), tokens, " ,;.:");
+	 for (uint i=0;i<tokens.Count();++i) {
+	  Gcstr w(tokens[i], true);
       if (w[0]=='@') {
     	  w=w.substr(1);
     	  w.lower();
@@ -261,7 +257,7 @@ void setTableFormat(GStr& s) {
       }
       CTableField col(w);
       tableCols.Add(col);
-	 }
+	 } //for each token
 }
 
 void loadRefTable(FILE* f, GHash<RefTran*>& rt) {
@@ -280,9 +276,9 @@ void loadRefTable(FILE* f, GHash<RefTran*>& rt) {
 }
 
 void openfw(FILE* &f, GArgs& args, char opt) {
-	GStr s=args.getOpt(opt);
+	Gcstr s=args.getOpt(opt);
 	if (!s.is_empty()) {
-		if (s=='-')
+		if (s=="-" || s=="stdout")
 			f=stdout;
 		else {
 			f=fopen(s,"w");
@@ -316,24 +312,27 @@ void processGffComment(const char* cmline, GfList* gflst) {
  if (cmline[0]!='#') return;
  const char* p=cmline;
  while (*p=='#') p++;
- GStr s(p);
+ Gcstr s(p);
  //this can be called only after gffloader initialization
  // so we can use gffloader.names->gseqs.addName()
- s.startTokenize("\t ", tkCharSet);
- GStr w;
-  if (s.nextToken(w) && w=="sequence-region") {
-	 GStr chr, wend;
-	 if (s.nextToken(chr) && s.nextToken(w) && s.nextToken(wend)) {
-		 int gseq_id=gffloader.names->gseqs.addName(chr.chars());
+ //s.startTokenize("\t ", tkCharSet);
+ GDynArray<char*> tokens;
+ strSpcSplit(s(), tokens);
+ if (tokens.Count()>3) {
+	 Gcstr w(tokens[0],true);
+	 if (w=="sequence-region") {
+		 int gseq_id=gffloader.names->gseqs.addName(tokens[1]);
 		 if (gseq_id>=0) {
 			 GenomicSeqData* gseqdata=getGSeqData(g_data, gseq_id);
+			 w.attach(tokens[2]);
 			 gseqdata->seqreg_start=w.asInt();
-			 gseqdata->seqreg_end=wend.asInt();
-		 }
-		 else GError("Error adding ref seq ID %s\n", chr.chars());
+			 w.attach(tokens[3]);
+			 gseqdata->seqreg_end=w.asInt();
+		 } else GError("Error adding ref seq ID %s\n", tokens[1]);
+		 return;
 	 }
-	 return;
  }
+
  if (gflst->Count()==0) {
     //initial Gff3 header, store it
 	char* hl=Gstrdup(cmline);
@@ -341,7 +340,7 @@ void processGffComment(const char* cmline, GfList* gflst) {
  }
 }
 
-void printGffObj(FILE* f, GffObj* gfo, GStr& locname, GffPrintMode exonPrinting, int& out_counter) {
+void printGffObj(FILE* f, GffObj* gfo, Gcstr& locname, GffPrintMode exonPrinting, int& out_counter) {
     GffObj& t=*gfo;
     GTData* tdata=(GTData*)(t.uptr);
     if (tdata->replaced_by!=NULL || !T_PRINTABLE(t.udata)) return;
@@ -534,7 +533,7 @@ int main(int argc, char* argv[]) {
 	   gfasta.init(args.getOpt('g'));
  //if (gfasta.fastaPath!=NULL)
  //    sortByLoc=true; //enforce sorting by chromosome/contig
- GStr s=args.getOpt('i');
+ Gcstr s=args.getOpt('i');
  if (!s.is_empty()) maxintron=s.asInt();
  s=args.getOpt('l');
  if (!s.is_empty()) minLen=s.asInt();
@@ -641,7 +640,7 @@ int main(int argc, char* argv[]) {
  }
 
  while (true) {
-   GStr infile;
+   Gcstr infile;
    if (numfiles) {
       infile=args.nextNonOpt();
       if (infile.is_empty()) break;
@@ -693,7 +692,7 @@ int main(int argc, char* argv[]) {
 	 if (r_bases>0) fprintf(stdout, "\t%" PRIu64 " on - strand\n", r_bases);
 	 if (u_bases>0) fprintf(stdout, "\t%" PRIu64 " on . strand\n", u_bases);
  }
- GStr loctrack("gffcl");
+ Gcstr loctrack("gffcl");
  if (tracklabel) loctrack=tracklabel;
  if (gffloader.sortRefsAlpha)
     g_data.setSorted(&gseqCmpName);
@@ -748,7 +747,7 @@ int main(int argc, char* argv[]) {
        //if (idxfirstvalid>=0) rnas_i=idxfirstvalid;
        int gfs_i=0;
        if (f_out) {
-           GStr locname("RLOC_");
+           Gcstr locname("RLOC_");
            locname.appendfmt("%08d",loc.locus_num);
            //GMessage("Locus: %s (%d-%d), %d rnas, %d gfs\n", locname.chars(), loc.start, loc.end,
            //	   loc.rnas.Count(), loc.gfs.Count());

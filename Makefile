@@ -74,7 +74,7 @@ endif
 # C/C++ linker
 
 OBJS := ${GCLDIR}/GBase.o ${GCLDIR}/GArgs.o ${GCLDIR}/GFaSeqGet.o \
- ${GCLDIR}/gdna.o ${GCLDIR}/codons.o ${GCLDIR}/gff.o ${GCLDIR}/GStr.o \
+ ${GCLDIR}/gdna.o ${GCLDIR}/codons.o ${GCLDIR}/gff.o \
  ${GCLDIR}/GFastaIndex.o gff_utils.o
  
 .PHONY : all
@@ -84,16 +84,14 @@ all static release debug memcheck memdebug profile gprof prof: ../gclib gffread
 ../gclib:
 	git clone https://github.com/gpertea/gclib.git ../gclib
 
-$(OBJS) : $(GCLDIR)/GBase.h $(GCLDIR)/gff.h
 gffread.o : gff_utils.h $(GCLDIR)/GBase.h $(GCLDIR)/gff.h
-gff_utils.o : gff_utils.h $(GCLDIR)/gff.h
+gff_utils.o : gff_utils.h $(GCLDIR)/gff.h $(GCLDIR)/GBase.h $(GCLDIR)/GHashMap.hh
 ${GCLDIR}/gff.o : ${GCLDIR}/gff.h ${GCLDIR}/GFaSeqGet.h ${GCLDIR}/GList.hh
 ${GCLDIR}/GFaSeqGet.o : ${GCLDIR}/GFaSeqGet.h
 gffread: $(OBJS) gffread.o
 	${LINKER} ${LDFLAGS} -o $@ ${filter-out %.a %.so, $^} ${LIBS}
 #	@echo
 #	${DBG_WARN}
-
 
 # target for removing all object files
 

@@ -1,7 +1,6 @@
 #ifndef GFF_UTILS_H
 #define GFF_UTILS_H
 #include "gff.h"
-#include "GStr.h"
 #include "GVec.hh"
 #include "GFaSeqGet.h"
 
@@ -46,7 +45,7 @@ extern bool add_hasCDS;
 
 extern bool adjustStop; //automatic adjust the CDS stop coordinate
 extern bool covInfo; // --cov-info : only report genome coverage
-extern GStr tableFormat; //list of "attributes" to print in tab delimited format
+extern Gcstr tableFormat; //list of "attributes" to print in tab delimited format
 extern bool spliceCheck; //only known splice-sites
 extern bool decodeChars; //decode url-encoded chars in attrs (-D)
 extern bool StarStop; //use * instead of . for stop codon translation
@@ -150,9 +149,9 @@ enum ETableFieldType {
 class CTableField {
  public:
    ETableFieldType type;
-   GStr name; //only for type ctfGFF_Attr
+   Gcstr name; //only for type ctfGFF_Attr
    CTableField(ETableFieldType atype=ctfGFF_Attr):type(atype) { }
-   CTableField(GStr& attrname):type(ctfGFF_Attr),name(attrname) { }
+   CTableField(Gcstr& attrname):type(ctfGFF_Attr),name(attrname) { }
 };
 
 
@@ -166,16 +165,16 @@ class GeneInfo;
 
 struct CIntronData:public GSeg {
 	char strand;//'.' < '-' < '+' (reverse ASCII order)
-	GVec<GStr> ts; //list of transcript IDs sharing this intron
+	GVec<Gcstr> ts; //list of transcript IDs sharing this intron
 	CIntronData(uint istart, uint iend, char tstrand, const char* t_id=NULL):GSeg(istart, iend),
 			strand(tstrand) {
 		if (t_id!=NULL) {
-			GStr tid(t_id);
+			Gcstr tid(t_id);
 		    ts.Add(tid);
 		}
 	}
 	void add(const char* t_id) {
-		 GStr tid(t_id);
+		 Gcstr tid(t_id);
 		 ts.Add(tid);
 	}
 	bool operator==(CIntronData& d){
@@ -251,8 +250,8 @@ class GeneInfo {
  public:
    int flag;
    GffObj* gf;
-   GList<GStr> gene_names;
-   GList<GStr> transcripts; //list of transcript IDs
+   GList<Gcstr> gene_names;
+   GList<Gcstr> transcripts; //list of transcript IDs
    GeneInfo():gene_names(true, true, true), transcripts(true,true,true) {
      gf=NULL;
      flag=0;
@@ -261,8 +260,8 @@ class GeneInfo {
    GeneInfo(GffObj* gfrec, GenomicSeqData* gdata, bool ensembl_convert=false):flag(0), gf(NULL), gene_names(true, true, true),
                     transcripts(true,true,true) {
      if (gfrec->getGeneName())
-        gene_names.Add(new GStr(gfrec->getGeneName()));
-     transcripts.Add(new GStr(gfrec->getID()));
+        gene_names.Add(new Gcstr(gfrec->getGeneName()));
+     transcripts.Add(new Gcstr(gfrec->getID()));
      create_gf(gfrec, gdata ,ensembl_convert);
    }
 
@@ -300,9 +299,9 @@ class GeneInfo {
    }
 
    void update(GffObj* gfrec) {
-     if (transcripts.AddedIfNew(new GStr(gfrec->getID()))<0)
+     if (transcripts.AddedIfNew(new Gcstr(gfrec->getID()))<0)
        return;
-     gene_names.AddedIfNew(new GStr(gfrec->getGeneName()));
+     gene_names.AddedIfNew(new Gcstr(gfrec->getGeneName()));
      if (gf==NULL) {
         GError("GeneInfo::update() called on uninitialized gf!\n");
      }
@@ -322,7 +321,7 @@ class GeneInfo {
      if (gene_names.Count()>0) {
        gf->addAttr("Name", gene_names[0]->chars());
      } //has gene names
-     GStr t(transcripts[0]->chars());
+     Gcstr t(transcripts[0]->chars());
      for (int i=1;i<transcripts.Count();i++) {
           t.append(",");
           t.append(transcripts[i]->chars());
@@ -361,7 +360,7 @@ class GenomicSeqData {
 
 class CGeneSym {
  public:
-  GStr name;
+  Gcstr name;
   int freq;
   CGeneSym(const char* n=NULL, int f=0):name(n), freq(f) { }
   bool operator<(CGeneSym& b) {
@@ -468,7 +467,7 @@ public:
         }
     }
 
-    void print(FILE *f, int idxfirstvalid, GStr& locname, GStr& loctrack) {
+    void print(FILE *f, int idxfirstvalid, Gcstr& locname, Gcstr& loctrack) {
         const char* gseqname=NULL;
         if (rnas.Count()>0) gseqname=rnas[0]->getGSeqName();
         else gseqname=gfs[0]->getGSeqName();
@@ -745,7 +744,7 @@ class GSpliceSite {
 class GffLoader {
  public:
   GVec<char*> headerLines; //for GFF3 we keep the first few header lines (not the sequence-region one)
-  GStr fname;
+  Gcstr fname;
   FILE* f;
   GffNames* names;
   CIntronList intronList; // collect introns for -j output
@@ -784,9 +783,9 @@ class GffLoader {
       names=GffObj::names;
   }
 
-  void loadRefNames(GStr& flst);
+  void loadRefNames(Gcstr& flst);
 
-  void openFile(GStr& file_name) {
+  void openFile(Gcstr& file_name) {
 	  //if (f!=NULL) closeFile();
 	  fname=file_name;
       if (fname=="-" || fname=="stdin") {
@@ -836,7 +835,7 @@ class GffLoader {
 
 };
 
-void printFasta(FILE* f, GStr* defline, char* seq, int seqlen=-1, bool useStar=false);
+void printFasta(FILE* f, Gcstr* defline, char* seq, int seqlen=-1, bool useStar=false);
 
 //void printTabFormat(FILE* f, GffObj* t);
 

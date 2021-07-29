@@ -33,7 +33,7 @@ bool add_hasCDS=false;
 //bool streamIn=false; // --stream option
 bool adjustStop=false; //automatic adjust the CDS stop coordinate
 bool covInfo=false; // --cov-info : only report genome coverage
-GStr tableFormat; //list of "attributes" to print in tab delimited format
+Gcstr tableFormat; //list of "attributes" to print in tab delimited format
 bool spliceCheck=false; //only known splice-sites
 bool decodeChars=false; //decode url-encoded chars in attrs (-D)
 bool StarStop=false; //use * instead of . for stop codon translation
@@ -42,11 +42,7 @@ bool fullCDSonly=false; // starts with START, ends with STOP codon
 bool multiExon=false;
 bool writeExonSegs=false;
 char* tracklabel=NULL;
-/*
-char* rfltGSeq=NULL;
-char rfltStrand=0;
-uint rfltStart=0;
-uint rfltEnd=MAX_UINT;*/
+
 GRangeParser* fltRange=NULL;
 
 GRangeParser* fltJunction=NULL;
@@ -76,7 +72,7 @@ GStrSet<> attrList;
 
 GHash<int> isoCounter; //counts the valid isoforms
 
-void printFasta(FILE* f, GStr* defline, char* seq, int seqlen, bool useStar) {
+void printFasta(FILE* f, Gcstr* defline, char* seq, int seqlen, bool useStar) {
  if (seq==NULL) return;
  int len=(seqlen>0)?seqlen:strlen(seq);
  if (len<=0) return;
@@ -216,7 +212,7 @@ char* getSeqDescr(char* seqid) {
  SeqInfo* seqd=seqinfo.Find(seqid);
  if (suf!=NULL) *suf='.';
  if (seqd!=NULL) {
-  GStr s(seqd->descr);
+  Gcstr s(seqd->descr);
   //cleanup some Uniref gunk
   if (s[0]=='[') {
     int r=s.index(']');
@@ -396,7 +392,7 @@ bool GffLoader::validateGffRec(GffObj* gffrec) {
 
 bool GffLoader::checkFilters(GffObj* gffrec) {
 	if (reftbl.Count()>0) { //check if we need to reject by ref seq filter
-		GStr refname(gffrec->getRefName());
+		Gcstr refname(gffrec->getRefName());
 		RefTran* rt=reftbl.Find(refname.chars());
 		if (rt==NULL && refname.length()>2 && refname[-2]=='.' && isdigit(refname[-1])) {
 			//try removing the version suffix
@@ -726,7 +722,7 @@ bool GffLoader::process_transcript(GFastaDb& gfasta, GffObj& gffrec) {
   if (adjstop!=NULL) delete adjstop;
   */
   if (cdsnt!=NULL) { // && !inframeStop) {
-	  GStr defline(gffrec.getID(), 94);
+	  Gcstr defline(gffrec.getID(), 94);
 	  if (writeExonSegs) {
 		  defline.append(" loc:");
 		  defline.append(gffrec.getGSeqName());
@@ -790,7 +786,7 @@ bool GffLoader::process_transcript(GFastaDb& gfasta, GffObj& gffrec) {
 	  if (wPadding>0)
 		  gffrec.removePadding(padLeft, padRight);
 
-	  GStr defline(gffrec.getID());
+	  Gcstr defline(gffrec.getID());
 	  if (exont!=NULL) {
 		  if (!wfaNoCDS && gffrec.CDstart>0) {
 			  defline.appendfmt(" CDS=%d-%d", cds_start, cds_end);
@@ -1280,14 +1276,14 @@ void collectLocusData(GList<GenomicSeqData>& ref_data, bool covInfo) {
 				if (tstrand=='+') fstrand++;
 				 else if (tstrand=='-') rstrand++;
 				   else ustrand++;
-				GStr gname(t.getGeneName());
+				Gcstr gname(t.getGeneName());
 				if (!gname.is_empty()) {
 					gname.upper();
 					int* prevg=gnames.Find(gname.chars());
 					if (prevg!=NULL) (*prevg)++;
 					else gnames.Add(gname.chars(), 1);
 				}
-				GStr geneid(t.getGeneID());
+				Gcstr geneid(t.getGeneID());
 				if (!geneid.is_empty()) {
 					int* prevg=gnames.Find(geneid.chars());
 					if (prevg!=NULL) (*prevg)++;
@@ -1295,10 +1291,10 @@ void collectLocusData(GList<GenomicSeqData>& ref_data, bool covInfo) {
 				}
 				//parse GeneID xrefs, if any (RefSeq):
 				/*
-				GStr xrefs(t.getAttr("xrefs"));
+				Gcstr xrefs(t.getAttr("xrefs"));
 				if (!xrefs.is_empty()) {
 					xrefs.startTokenize(",");
-					GStr token;
+					Gcstr token;
 					while (xrefs.nextToken(token)) {
 						token.upper();
 						if (token.startsWith("GENEID:")) {
@@ -1318,14 +1314,14 @@ void collectLocusData(GList<GenomicSeqData>& ref_data, bool covInfo) {
 			for (int i=0;i<loc.gfs.Count();i++) {
 				GffObj& nt=*(loc.gfs[i]);
 				if (nt.isGene()) {
-					GStr gname(nt.getGeneName());
+					Gcstr gname(nt.getGeneName());
 					if (!gname.is_empty()) {
 						gname.upper();
 						int* prevg=gnames.Find(gname.chars());
 						if (prevg!=NULL) (*prevg)++;
 						else gnames.Add(gname, 1);
 					}
-					GStr geneid(nt.getID());
+					Gcstr geneid(nt.getID());
 					if (!geneid.is_empty()) {
 						int* prevg=gnames.Find(geneid.chars());
 						if (prevg!=NULL) (*prevg)++;
@@ -1334,10 +1330,10 @@ void collectLocusData(GList<GenomicSeqData>& ref_data, bool covInfo) {
 				}
 				//parse GeneID xrefs, if any (RefSeq):
 				/*
-				GStr xrefs(nt.getAttr("xrefs"));
+				Gcstr xrefs(nt.getAttr("xrefs"));
 				if (!xrefs.is_empty()) {
 					xrefs.startTokenize(",");
-					GStr token;
+					Gcstr token;
 					while (xrefs.nextToken(token)) {
 						token.upper();
 						if (token.startsWith("GENEID:")) {
@@ -1381,24 +1377,17 @@ void collectLocusData(GList<GenomicSeqData>& ref_data, bool covInfo) {
 	}//for each genomic sequence
 }
 
-void GffLoader::loadRefNames(GStr& flst) {
- //load the whole file and split by (' \t\n\r,'
-	int64_t fsize=fileSize(flst.chars());
-	if (fsize<0) GError("Error: could not get file size for %s !\n",
-			flst.chars());
-	GStr slurp("", fsize+1);
-	//sanity check for file size?
-	FILE* f=fopen(flst.chars(), "r");
-	if (f==NULL)
-		GError("Error: could not open file %s !\n", flst.chars());
-	slurp.read(f, NULL);
-	fclose(f);
-	slurp.startTokenize(" ,;\t\r\n", tkCharSet);
-	GStr refname;
-	while (slurp.nextToken(refname)) {
-		if (refname.is_empty()) continue;
-		names->gseqs.addName(refname.chars());
-	}
+void GffLoader::loadRefNames(Gcstr& flst) {
+	 GLineReader fr(flst.chars());
+	 while (!fr.isEof()) {
+	     char* line=fr.getLine();
+	     if (line==NULL) break;
+	     if (line[0]=='#') continue; //skip comments
+	     GDynArray<char*> ids;
+	     strSpcSplit(line, ids); //could be multiple ids per line
+	     for (uint i=0;i<ids.Count();i++)
+	    	 names->gseqs.addName(ids[i]);
+	 }
 }
 
 GenomicSeqData* getGSeqData(GList<GenomicSeqData>& seqdata, int gseq_id) {
