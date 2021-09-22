@@ -780,7 +780,10 @@ int main(int argc, char* argv[]) {
 					    	 firstLocusPrint=false;
 					     }
 				       }
-				       if (fmtTable)  printAsTable(f_out, loc.rnas[rnas_i], &out_counter);
+				       if (fmtTable) {
+					       loc.rnas[rnas_i]->addAttr("locus", locname.chars());
+					       printAsTable(f_out, loc.rnas[rnas_i], &out_counter);
+				       }
 				       else printGffObj(f_out, loc.rnas[rnas_i], locname, exonPrinting, out_counter);
 					   ++rnas_i;
 			   }
