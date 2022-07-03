@@ -276,13 +276,13 @@ void loadRefTable(FILE* f, GHash<RefTran*>& rt) {
 }
 
 void openfw(FILE* &f, GArgs& args, char opt) {
-	Gcstr s=args.getOpt(opt);
-	if (!s.is_empty()) {
-		if (s=="-" || s=="stdout")
+	const char* s=args.getOpt(opt);
+	if (s!=NULL && s[0]!='\0') {
+		if (strcmp(s,"-")==0)
 			f=stdout;
 		else {
 			f=fopen(s,"w");
-			if (f==NULL) GError("Error creating file: %s\n", s.chars());
+			if (f==NULL) GError("Error creating file: %s\n", s);
 		}
 	}
 }
