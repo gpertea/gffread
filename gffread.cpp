@@ -652,10 +652,10 @@ int main(int argc, char* argv[]) {
    }
    else infile="-";
 
-   const char* fext=getFileExt(infile.chars());
-   if (BEDinput || (Gstricmp(fext, "bed")==0))
+   //const char* fext=getFileExt(infile.chars());
+   if (BEDinput || endsiWith(infile.chars(), "bed") || endsiWith(infile.chars(), "bed.gz"))
 	   gffloader.BEDinput=true;
-   if (TLFinput || (Gstricmp(fext, "tlf")==0))
+   if (TLFinput || endsiWith(infile.chars(), "tlf") || endsiWith(infile.chars(), "tlf.gz"))
 	   gffloader.TLFinput=true;
    gffloader.openFile(infile);
    if (gffloader.streamIn) { //streaming in - disable all bulk load features
