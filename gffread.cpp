@@ -170,7 +170,7 @@ void loadIDlist(FILE* f, GStrSet<> & idhash) {
   }
 }
 
-void loadSeqInfo(FILE* f, GHash<SeqInfo*> &si) {
+void loadSeqInfo(FILE* f) {
   GLineReader fr(f);
   while (!fr.isEof()) {
       char* line=fr.getLine();
@@ -196,7 +196,7 @@ void loadSeqInfo(FILE* f, GHash<SeqInfo*> &si) {
          continue;
          }
       // --- here we have finished parsing the line
-      si.Add(id, new SeqInfo(len,text));
+      seqinfo.Add(id, new SeqInfo(len,text));
       } //while lines
 }
 
@@ -260,7 +260,7 @@ void setTableFormat(Gcstr& s) {
 	 } //for each token
 }
 
-void loadRefTable(FILE* f, GHash<RefTran*>& rt) {
+void loadRefTable(FILE* f) {
   GLineReader fr(f);
   char* line=NULL;
   while ((line=fr.getLine())) {
@@ -271,7 +271,7 @@ void loadRefTable(FILE* f, GHash<RefTran*>& rt) {
       *p=0;p++;//split the line here
       while (*p==' ' || *p=='\t') p++;
       if (*p==0) continue;
-      rt.Add(orig_id, new RefTran(p));
+      reftbl.Add(orig_id, new RefTran(p));
       } //while lines
 }
 
@@ -516,7 +516,7 @@ int main(int argc, char* argv[]) {
  }
 
  tableFormat=args.getOpt("table");
- if (!tableFormat.is_empty()) {
+ if (! tableFormat.is_empty() ) {
 	 setTableFormat(tableFormat);
 	 fmtTable=true;
 	 fmtGFF3=false;
@@ -575,14 +575,14 @@ int main(int argc, char* argv[]) {
  if (!s.is_empty()) {
    FILE* ft=fopen(s,"r");
    if (ft==NULL) GError("Error opening reference table: %s\n",s.chars());
-   loadRefTable(ft, reftbl);
+   loadRefTable(ft);
    fclose(ft);
    }
  s=args.getOpt('s');
  if (!s.is_empty()) {
    FILE* fsize=fopen(s,"r");
    if (fsize==NULL) GError("Error opening info file: %s\n",s.chars());
-   loadSeqInfo(fsize, seqinfo);
+   loadSeqInfo(fsize);
    fclose(fsize);
  }
  s=args.getOpt("ids");
