@@ -1,5 +1,8 @@
 #!/bin/bash
 cd examples
+if [[ ! -d out.test ]]; then
+mkdir out.test
+fi
 arrparms=( "annotation.gff -g genome.fa -w out.test/transcripts.fa" \
 "annotation.gff -T -o out.test/annotation_T.gtf" \
 'annotation.gff --table @id,@chr,@start,@end,@strand,@exons,Name,gene,product -o out.test/annotation.tbl' )
