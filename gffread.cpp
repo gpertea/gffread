@@ -134,7 +134,7 @@ Output options:\n\
  --table output a simple tab delimited format instead of GFF, with columns\n\
        having the values of GFF attributes given in <attrlist>; special\n\
        pseudo-attributes (prefixed by @) are recognized:\n\
-       @id, @geneid, @chr, @start, @end, @strand, @numexons, @exons, \n\
+       @id, @geneid, @chr, @start, @end, @strand, @track, @numexons, @exons,\n\
        @cds, @covlen, @cdslen\n\
        If any of -w/-y/-x FASTA output files are enabled, the same fields\n\
        (excluding @id) are appended to the definition line of corresponding\n\
@@ -216,6 +216,7 @@ void setTableFormat(GStr& s) {
 	 if (s.is_empty()) return;
 	 GHash<ETableFieldType> specialFields;
 	 specialFields.Add("chr", ctfGFF_chr);
+	 specialFields.Add("track", ctfGFF_track);
 	 specialFields.Add("id", ctfGFF_ID);
 	 specialFields.Add("geneid", ctfGFF_geneID);
 	 specialFields.Add("genename", ctfGFF_geneName);
@@ -229,7 +230,7 @@ void setTableFormat(GStr& s) {
 	 specialFields.Add("cds", ctfGFF_cds);
 	 specialFields.Add("covlen", ctfGFF_covlen);
 	 specialFields.Add("cdslen", ctfGFF_cdslen);
-
+	 specialFields.Add("attrs", ctfGFF_all_attrs);
 	 s.startTokenize(" ,;.:", tkCharSet);
 	 GStr w;
 	 while (s.nextToken(w)) {

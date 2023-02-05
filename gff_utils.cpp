@@ -307,6 +307,9 @@ void printTableData(FILE* f, GffObj& g, bool inFasta) {
 		case ctfGFF_chr:
 			fprintf(f,"%s",g.getGSeqName());
 			break;
+		case ctfGFF_track:
+			fprintf(f,"%s",g.getTrackName());
+			break;
 		case ctfGFF_ID:
 			if (!inFasta)
 			  fprintf(f,"%s",g.getID());

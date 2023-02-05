@@ -136,6 +136,7 @@ enum ETableFieldType {
   ctfGFF_geneName, //geneName or @gene_name or @genename
   ctfGFF_Parent, //Parent or @parent
   ctfGFF_chr, //@chr
+  ctfGFF_track, //@track column
   ctfGFF_feature, //@feature
   ctfGFF_start, //@start
   ctfGFF_end, //@end
@@ -144,7 +145,8 @@ enum ETableFieldType {
   ctfGFF_exons, //@exons
   ctfGFF_cds, //@cds
   ctfGFF_covlen, //@covlen
-  ctfGFF_cdslen//@cdslen
+  ctfGFF_cdslen,//@cdslen
+  ctfGFF_all_attrs,//@attrs - all non-req attrs found in the input
 };
 
 class CTableField {
