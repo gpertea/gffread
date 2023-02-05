@@ -143,10 +143,11 @@ enum ETableFieldType {
   ctfGFF_strand, //@strand
   ctfGFF_numexons, //@numexons
   ctfGFF_exons, //@exons
+  ctfGFF_introns, //@introns
   ctfGFF_cds, //@cds
   ctfGFF_covlen, //@covlen
   ctfGFF_cdslen,//@cdslen
-  ctfGFF_all_attrs,//@attrs - all non-req attrs found in the input
+  ctfGFF_all_attrs,//@attrs - all non-req attrs found across all gff records
 };
 
 class CTableField {

@@ -346,6 +346,14 @@ void printTableData(FILE* f, GffObj& g, bool inFasta) {
 				}
 			} else fprintf(f,".");
 			break;
+		case ctfGFF_introns:
+			if (g.exons.Count()>1) {
+				for (int i=0;i<g.exons.Count()-1;i++) {
+					if (i>0) fprintf(f,",");
+					fprintf(f,"%d-%d",g.exons[i]->end+1, g.exons[i+1]->start-1);
+				}
+			} else fprintf(f,".");
+			break;
 		case ctfGFF_cds:
 			if (g.hasCDS()) {
 				GVec<GffExon> cds;

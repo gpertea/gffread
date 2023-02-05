@@ -135,7 +135,7 @@ Output options:\n\
        having the values of GFF attributes given in <attrlist>; special\n\
        pseudo-attributes (prefixed by @) are recognized:\n\
        @id, @geneid, @chr, @start, @end, @strand, @track, @numexons, @exons,\n\
-       @cds, @covlen, @cdslen\n\
+       @cds, @introns, @covlen, @cdslen\n\
        If any of -w/-y/-x FASTA output files are enabled, the same fields\n\
        (excluding @id) are appended to the definition line of corresponding\n\
        FASTA records\n\
@@ -227,10 +227,11 @@ void setTableFormat(GStr& s) {
 	 specialFields.Add("strand", ctfGFF_strand);
 	 specialFields.Add("numexons", ctfGFF_numexons);
 	 specialFields.Add("exons", ctfGFF_exons);
+	 specialFields.Add("introns", ctfGFF_introns);
 	 specialFields.Add("cds", ctfGFF_cds);
 	 specialFields.Add("covlen", ctfGFF_covlen);
 	 specialFields.Add("cdslen", ctfGFF_cdslen);
-	 specialFields.Add("attrs", ctfGFF_all_attrs);
+	 specialFields.Add("attrs", ctfGFF_all_attrs); //TODO: implement this -- all the attrs not already provided
 	 s.startTokenize(" ,;.:", tkCharSet);
 	 GStr w;
 	 while (s.nextToken(w)) {
