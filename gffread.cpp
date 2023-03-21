@@ -108,9 +108,12 @@ Output options:\n\
       for all input mappings, OR a directory with single-fasta files\n\
       (one per genomic sequence, with file names matching sequence names)\n\
  -j    output the junctions and the corresponding transcripts\n\
+ -u    write a fasta file with the whole span of each transcript\n\
+       (including introns)\n\
  -w    write a fasta file with spliced exons for each transcript\n\
  --w-add <N> for the -w option, extract additional <N> bases\n\
        both upstream and downstream of the transcript boundaries\n\
+	   (this also applies to -u option)\n\
  --w-nocds for -w, disable the output of CDS info in the FASTA file\n\
  -x    write a fasta file with spliced CDS for each GFF transcript\n\
  -y    write a protein fasta file with the translation of CDS for each record\n\
@@ -395,6 +398,7 @@ void shutDown() {
 	delete fltJunction;
 	FWCLOSE(f_out);
 	FWCLOSE(f_w);
+	FWCLOSE(f_u);
 	FWCLOSE(f_x);
 	FWCLOSE(f_y);
 	FWCLOSE(f_j);
@@ -404,7 +408,7 @@ int main(int argc, char* argv[]) {
  GArgs args(argc, argv,
    "version;debug;merge;stream;adj-stop;bed;in-bed;tlf;in-tlf;cluster-only;nc;cov-info;help;"
     "sort-alpha;keep-genes;w-nocds;attrs=;w-add=;ids=;nids=;jmatch=;gtf;keep-comments;keep-exon-attrs;force-exons;t-adopt;gene2exon;"
-    "ignore-locus;no-pseudo;table=sort-by=hvOUNHPWCVJMKQYTDARSZFGLEBm:g:i:r:s:l:t:o:w:x:y:j:d:");
+    "ignore-locus;no-pseudo;table=sort-by=hvOUNHPWCVJMKQYTDARSZFGLEBm:g:i:r:s:l:t:o:u:w:x:y:j:d:");
  args.printError(USAGE, true);
  int numfiles = args.startNonOpt();
  if (args.getOpt("version")) {
@@ -608,22 +612,24 @@ int main(int argc, char* argv[]) {
  }
  openfw(f_out, args, 'o');
  //if (f_out==NULL) f_out=stdout;
- if (gfasta.fastaPath==NULL && (validCDSonly || spliceCheck || args.getOpt('w')!=NULL || args.getOpt('x')!=NULL || args.getOpt('y')!=NULL))
-  GError("Error: -g option is required for options -w, -x, -y, -V, -N, -M !\n");
+ if (gfasta.fastaPath==NULL && (validCDSonly || spliceCheck || args.getOpt('w')!=NULL || args.getOpt('x')!=NULL ||
+		 args.getOpt('y')!=NULL || args.getOpt('u')!=NULL))
+  GError("Error: -g option is required for options -w/x/y/u/V/N/M !\n");
  openfw(f_w, args, 'w');
+ openfw(f_u, args, 'u');
  openfw(f_x, args, 'x');
  openfw(f_y, args, 'y');
  openfw(f_j, args, 'j');
  s=args.getOpt("w-add");
  if (!s.is_empty()) {
-	 if (f_w==NULL) GError("Error: --w-add option requires -w option!\n");
+	 if (f_w==NULL && f_u==NULL) GError("Error: --w-add option requires -w or -u option!\n");
 	 wPadding=s.asInt();
  }
 
  if (f_w!=NULL && args.getOpt("w-nocds"))
 	 wfaNoCDS=true;
 
- if (f_out==NULL && f_w==NULL && f_x==NULL && f_y==NULL && f_j==NULL && !covInfo)
+ if (f_out==NULL && f_w==NULL && f_u==NULL && f_x==NULL && f_y==NULL && f_j==NULL && !covInfo)
 	 f_out=stdout;
 
  //if (f_y!=NULL || f_x!=NULL) wCDSonly=true;

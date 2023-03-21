@@ -13,6 +13,8 @@ extern FILE* ffasta;
 extern FILE* f_in;
 extern FILE* f_out;
 extern FILE* f_w; //writing fasta with spliced exons (transcripts)
+extern FILE* f_u; //writing fasta with unspliced transcripts sequences
+
 extern int wPadding; //padding for -w option
 extern FILE* f_x; //writing fasta with spliced CDS
 extern FILE* f_y; //wrting fasta with translated CDS
@@ -839,7 +841,7 @@ class GffLoader {
 
 };
 
-void printFasta(FILE* f, GStr* defline, char* seq, int seqlen=-1, bool useStar=false);
+void printFasta(FILE* f, GStr* defline, const char* seq, int seqlen=-1, bool useStar=false);
 
 //void printTabFormat(FILE* f, GffObj* t);
 

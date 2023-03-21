@@ -10,6 +10,7 @@ FILE* ffasta=NULL;
 FILE* f_in=NULL;
 FILE* f_out=NULL;
 FILE* f_w=NULL; //writing fasta with spliced exons (transcripts)
+FILE* f_u=NULL;
 int wPadding = 0; //padding for -w option
 FILE* f_x=NULL; //writing fasta with spliced CDS
 FILE* f_y=NULL; //wrting fasta with translated CDS
@@ -76,7 +77,8 @@ GStrSet<> attrList;
 
 GHash<int> isoCounter; //counts the valid isoforms
 
-void printFasta(FILE* f, GStr* defline, char* seq, int seqlen, bool useStar) {
+void printFasta(FILE* f, GStr* defline, const char* seq, int seqlen, bool useStar) {
+	//if seqlen is provided >0, seq does not have to be 0-terminated
  if (seq==NULL) return;
  int len=(seqlen>0)?seqlen:strlen(seq);
  if (len<=0) return;
@@ -578,7 +580,7 @@ bool GffLoader::process_transcript(GFastaDb& gfasta, GffObj& gffrec) {
   }
   GMapSegments seglst(gffrec.strand);
   GFaSeqGet* faseq=NULL;
-  if (f_x!=NULL || f_y!=NULL || f_w!=NULL || spliceCheck || validCDSonly || addCDSattrs) {
+  if (f_x!=NULL || f_y!=NULL || f_w!=NULL || f_u!=NULL || spliceCheck || validCDSonly || addCDSattrs) {
 	  faseq=fastaSeqGet(gfasta, gffrec.getGSeqName());
       if (faseq==NULL)
 	    	GError("Error: no genomic sequence available (check -g option!).\n");
@@ -849,6 +851,35 @@ bool GffLoader::process_transcript(GFastaDb& gfasta, GffObj& gffrec) {
 		  GFREE(exont);
 	  }
   } //writing f_w (spliced exons)
+  if (f_u!=NULL) { //write unspliced transcript sequence
+	  int padLeft=0;
+	  int padRight=0;
+	  if (wPadding>0) {
+		padLeft= (gffrec.start>(uint)wPadding) ? wPadding : gffrec.start - 1;
+		int ediff=faseq->getseqlen()-gffrec.end;
+	    padRight=(wPadding>ediff) ?  ediff : wPadding;
+	  }
+	  //char* exont=gffrec.getSpliced(faseq, false, &seqlen, &cds_start, &cds_end, &seglst);
+	  int fspan=gffrec.end-gffrec.start+1+padLeft+padRight;
+	  int fstart=gffrec.start-padLeft;
+	  const char* tseq=faseq->subseq(fstart, fspan); //non-zero-terminated
+	  //fspan will be updated with whatever was read
+	  if (tseq==NULL) {
+	        GError("Error getting transcripts seq for %s (%d : %d)!\n", gffrec.getID(), fstart, fspan);
+	  }
+
+	  GStr defline(gffrec.getID());
+	  if (tseq!=NULL && fspan>0) {
+		  fprintf(f_u, ">%s", defline.chars());
+		  if (fmtTable) printTableData(f_u, gffrec, true);
+		    else {
+		    	if (gffrec.attrs!=NULL && gffrec.attrs->Count()>0) fprintf(f_u," ");
+		    	gffrec.printAttrs(f_u, ";", false, decodeChars, false);
+		    	fprintf(f_u, "\n");
+		    }
+		  printFasta(f_u, NULL, tseq, fspan);
+	  }
+  } //writing f_u (unspliced sequence)
   return true;
 }
 
