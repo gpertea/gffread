@@ -364,7 +364,7 @@ class GenomicSeqData {
   }
 };
 
-class CGeneSym {
+/* class CGeneSym {
  public:
   GStr name;
   int freq;
@@ -374,7 +374,7 @@ class CGeneSym {
          (name.length()<b.name.length()) ) : ( freq>b.freq );
      }
   bool operator==(CGeneSym& b) { return name==b.name; }
-};
+};*/
 
 const char* getGeneDescr(const char* gsym);
 
@@ -390,8 +390,8 @@ public:
     GList<GffObj> gfs; //list of non-transcripts (genes) in this locus
     GList<GffObj> rnas; //list of transcripts (isoforms) for this locus
     GArray<GSeg> mexons; //list of merged exons in this region
-    GList<CGeneSym> gene_names;
-    GList<CGeneSym> gene_ids;
+    GList<GStr> gene_names;
+    GList<GStr> gene_ids;
     int v; //user flag/data
    /*
    bool operator==(GffLocus& d){
@@ -407,7 +407,7 @@ public:
     */
     const char* getGeneName() {
          if (gene_names.Count()==0) return NULL;
-         return gene_names.First()->name.chars();
+         return gene_names.First()->chars();
          }
     const char* get_tmax_id() {
          return t_maxcov->getID();
@@ -415,7 +415,7 @@ public:
     const char* get_descr() {
        if (gene_names.Count()>0) {
           for (int i=0;i<gene_names.Count();i++) {
-            const char* gn=getGeneDescr(gene_names.First()->name.chars());
+            const char* gn=getGeneDescr(gene_names.First()->chars());
             if (gn!=NULL) return gn;
             }
           }
@@ -431,7 +431,7 @@ public:
        }
 
     GffLocus(GffObj* t=NULL):gfs(true,false,false), rnas(true,false,false),mexons(true,true),
-           gene_names(true,true,false), gene_ids(true,true,false) {
+           gene_names(true,true,true), gene_ids(true,true,true) {
         //this will NOT free rnas!
         t_maxcov=NULL;
         gseq_id=-1;
@@ -482,15 +482,15 @@ public:
                     locname.chars());
         //const char* loc_gname=loc.getGeneName();
         if (this->gene_names.Count()>0) { //print all gene names associated to this locus
-             fprintf(f, ";genes=%s",this->gene_names.First()->name.chars());
+             fprintf(f, ";genes=%s",this->gene_names.First()->chars());
              for (int i=1;i<this->gene_names.Count();i++) {
-               fprintf(f, ",%s",this->gene_names[i]->name.chars());
+               fprintf(f, ",%s",this->gene_names[i]->chars());
              }
         }
         if (this->gene_ids.Count()>0) { //print all GeneIDs names associated to this locus
-             fprintf(f, ";geneIDs=%s",this->gene_ids.First()->name.chars());
+             fprintf(f, ";geneIDs=%s",this->gene_ids.First()->chars());
              for (int i=1;i<this->gene_ids.Count();i++) {
-               fprintf(f, ",%s",this->gene_ids[i]->name.chars());
+               fprintf(f, ",%s",this->gene_ids[i]->chars());
              }
         }
         if (idxfirstvalid>=0) {

@@ -1403,12 +1403,14 @@ void collectLocusData(GList<GenomicSeqData>& ref_data, bool covInfo) {
 			}
 			locus_num++;
 			loc.locus_num=locus_num;
+
 			if (gnames.Count()>0) { //collect all gene names associated to this locus
 				gnames.startIterate();
 				int gfreq=0;
 				const char* key=NULL;
 				while ((key=gnames.Next(gfreq))!=NULL) {
-					loc.gene_names.AddIfNew(new CGeneSym(key, gfreq));
+					//loc.gene_names.AddIfNew(new CGeneSym(key, gfreq));
+					loc.gene_names.AddedIfNew(new GStr(key));
 				}
 			} //added collected gene_names
 			if (geneids.Count()>0) { //collect all GeneIDs names associated to this locus
@@ -1416,9 +1418,11 @@ void collectLocusData(GList<GenomicSeqData>& ref_data, bool covInfo) {
 				int gfreq=0;
 				const char* key=NULL;
 				while ((key=geneids.Next(gfreq))!=NULL) {
-					loc.gene_ids.AddIfNew(new CGeneSym(key, gfreq));
+					//loc.gene_ids.AddIfNew(new CGeneSym(key, gfreq));
+					loc.gene_ids.AddedIfNew(new GStr(key));
 				}
 			}
+
 		} //for each locus
 	}//for each genomic sequence
 }
