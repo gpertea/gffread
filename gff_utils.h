@@ -773,13 +773,14 @@ class GffLoader {
 		bool sortRefsAlpha:1;
 		bool doCluster:1;
 		bool collapseRedundant:1; //discard "redundant" transcripts (-M/--merge activated)
-		bool matchAllIntrons:1; //if true, contained transcripts are NOT discarded
-		bool fuzzSpan:1; //matching/contained redundancy relaxed to disregard full boundary containment
+		bool matchAllIntrons:1; //if 0, contained transcripts can be discarded (-K)
+		bool ncSpan:1; //matching/contained of transcript spans not enforced (-Q), overlapping SETs can be merged
 		bool dOvlSET:1; //discard overlapping Single Exon Transcripts on any strand
 		bool forceExons:1;
 		bool streamIn:1;
 		bool ensemblProc:1;
 		bool attrsFilter:1;
+		bool cSETMerge:1;  //--cset, for when -K was given, also merge SETx into exons of METx
 	  };
   };
 

@@ -899,7 +899,7 @@ bool GffLoader::unsplContained(GffObj& ti, GffObj&  tj) {
   int imax=ti.exons.Count()-1;
   int jmax=tj.exons.Count()-1;
   if (imax>0) GError("Error: bad unsplContained() call, 1st parameter must be single-exon transcript!\n");
-  if (fuzzSpan) {
+  if (ncSpan) {
     int maxIntronOvl=dOvlSET ? 25 : 0;
     //int minovl = dOvlSET ? 5 : (int)(0.8 * ti.len()); //minimum overlap to declare "redundancy"
     for (int j=0;j<=jmax;j++) {
@@ -931,8 +931,9 @@ GffObj* GffLoader::redundantTranscripts(GffObj& ti, GffObj&  tj) {
   //                   they have the exact same number of introns and same splice sites (or none)
   //                   (single-exon transcripts should be also fully contained to be considered matching)
   // matchAllIntrons==false: an intron chain could be a subset of a "container" chain,
-  //                   as long as no intron-exon boundaries are violated; also, a single-exon
-  //                   transcript will be collapsed if it's contained in one of the exons of the another transcript
+  //                   as long as no intron-exon boundaries are violated;
+  //                   also, if --cset was given, a single-exon transcript will be collapsed
+  //                   if it's contained in one of the exons of the another transcript
   // fuzzSpan==false: the genomic span of one transcript MUST BE contained in or equal with the genomic
   //                  span of the other
   //
@@ -951,12 +952,12 @@ GffObj* GffLoader::redundantTranscripts(GffObj& ti, GffObj&  tj) {
    if (imax!=jmax) return NULL; //must have the same number of exons!
    if (ti.covlen>tj.covlen) {
       bigger=&ti;
-      if (!fuzzSpan && (ti.start>tj.start || ti.end<tj.end))
+      if (!ncSpan && (ti.start>tj.start || ti.end<tj.end))
         return NULL; //no containment
    }
    else { //ti.covlen<=tj.covlen
       bigger=&tj;
-      if (!fuzzSpan && (tj.start>ti.start || tj.end<ti.end))
+      if (!ncSpan && (tj.start>ti.start || tj.end<ti.end))
          return NULL; //no containment
    }
    //check that all introns really match
@@ -993,7 +994,7 @@ GffObj* GffLoader::redundantTranscripts(GffObj& ti, GffObj&  tj) {
  }
  if (imax==0 && jmax==0) {
      //single-exon transcripts: if fuzzSpan, at least 80% of the shortest one must be overlapped by the other
-     if (fuzzSpan) {
+     if (ncSpan) {
        if (dOvlSET) {
            return (ti.exons[0]->overlapLen(tj.exons[0]->start-1, tj.exons[0]->end+1)>0) ? bigger : NULL;
        } else {
@@ -1003,9 +1004,9 @@ GffObj* GffLoader::redundantTranscripts(GffObj& ti, GffObj&  tj) {
        return (smaller->start>=bigger->start && smaller->end<=bigger->end) ? bigger : NULL;
      }
  }
- //containment is also considered redundancy
- if (smaller->exons.Count()==1) {
-   //check if this single exon is contained in any of tj exons
+
+ if (cSETMerge && smaller->exons.Count()==1) {
+   //if --cset, check if this single exon is contained in any of tj exons
    //without violating any intron-exon boundaries
    return (unsplContained(*smaller, *bigger) ? bigger : NULL);
  }
@@ -1029,7 +1030,7 @@ GffObj* GffLoader::redundantTranscripts(GffObj& ti, GffObj&  tj) {
     //we found an intron overlap
     break;
  }
- if (!fuzzSpan && (bigger->start>smaller->start || bigger->end < smaller->end)) return NULL;
+ if (!ncSpan && (bigger->start>smaller->start || bigger->end < smaller->end)) return NULL;
  if ((i>1 && j>1) || i>imax || j>jmax) {
      return NULL; //either no intron overlaps found at all
                   //or it's not the first intron for at least one of the transcripts

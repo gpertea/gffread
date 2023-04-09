@@ -90,6 +90,8 @@ Clustering:\n\
       \"duplicate\" transcripts, only create \"locus\" features\n\
  -K   for -M option: also discard as redundant the shorter, fully contained\n\
        transcripts (intron chains matching a part of the container)\n\
+ --cset for -K option, discard single exon transcripts when fully contained\n\
+        in an exon of a multi-exon transcript\n\
  -Q   for -M option, no longer require boundary containment when assessing\n\
       redundancy (can be combined with -K); only introns have to match for\n\
       multi-exon transcripts, and >=80% overlap for single-exon transcripts\n\
@@ -406,7 +408,7 @@ void shutDown() {
 
 int main(int argc, char* argv[]) {
  GArgs args(argc, argv,
-   "version;debug;merge;stream;adj-stop;bed;in-bed;tlf;in-tlf;cluster-only;nc;cov-info;help;"
+   "version;debug;merge;stream;adj-stop;bed;in-bed;tlf;in-tlf;cluster-only;nc;cset;cov-info;help;"
     "sort-alpha;keep-genes;w-nocds;attrs=;w-add=;ids=;nids=;jmatch=;gtf;keep-comments;keep-exon-attrs;force-exons;t-adopt;gene2exon;"
     "ignore-locus;no-pseudo;table=sort-by=hvOUNHPWCVJMKQYTDARSZFGLEBm:g:i:r:s:l:t:o:u:w:x:y:j:d:");
  args.printError(USAGE, true);
@@ -468,30 +470,37 @@ int main(int argc, char* argv[]) {
  if (!sortBy.is_empty())
 	   gffloader.loadRefNames(sortBy);
  gffloader.gene2exon=(args.getOpt("gene2exon")!=NULL);
- gffloader.matchAllIntrons=(args.getOpt('K')==NULL);
- gffloader.fuzzSpan=(args.getOpt('Q')!=NULL);
+ gffloader.matchAllIntrons=(args.getOpt('K')==NULL); //when 0, contained chains are merged into container
+ gffloader.ncSpan=(args.getOpt('Q')!=NULL); //not requiring full-span containment;SETs are merged if they overlap 80%
  gffloader.dOvlSET=(args.getOpt('Y')!=NULL);
  if (args.getOpt('M') || args.getOpt("merge")) {
 	 gffloader.doCluster=true;
 	 gffloader.collapseRedundant=true;
   } else {
-    if (!gffloader.matchAllIntrons || gffloader.fuzzSpan || gffloader.dOvlSET) {
+    if (!gffloader.matchAllIntrons || gffloader.ncSpan || gffloader.dOvlSET) {
       GMessage("%s",USAGE);
       GMessage("Error: options -K,-Q,-Y require -M/--merge option!\n");
       exit(1);
     }
  }
+ if (args.getOpt("cset")) {
+	 gffloader.cSETMerge=1;
+	 if (gffloader.matchAllIntrons) {
+		 GMessage("Error: option --cset requires option -K\n");
+		 exit(1);
+	 }
+ }
  if (args.getOpt("cluster-only")) {
 	 gffloader.doCluster=true;
 	 gffloader.collapseRedundant=false;
-    if (!gffloader.matchAllIntrons || gffloader.fuzzSpan || gffloader.dOvlSET) {
+    if (!gffloader.matchAllIntrons || gffloader.ncSpan || gffloader.dOvlSET) {
       GMessage("%s",USAGE);
       GMessage("Error: option -K,-Q,-Y have no effect with --cluster-only.\n");
       exit(1);
     }
  }
  if (gffloader.dOvlSET)
-	 gffloader.fuzzSpan=true; //-Q enforced by -Y
+	 gffloader.ncSpan=true; //-Q enforced by -Y
  covInfo=(args.getOpt("cov-info"));
  if (covInfo) gffloader.doCluster=true; //need to collapse overlapping exons
  if (fullCDSonly) validCDSonly=true;
