@@ -1556,9 +1556,11 @@ void GffLoader::load(GList<GenomicSeqData>& seqdata, GFFCommentParser* gf_parsec
 	//add to GenomicSeqData, adding to existing loci and identifying intron-chain duplicates
 	for (int k=0;k<gffr->gflst.Count();k++) {
 		GffObj* m=gffr->gflst[k];
-		if (strcmp(m->getFeatureName(), "locus")==0 &&
+		if (ignoreLocus) {
+		   if (strcmp(m->getFeatureName(), "locus")==0 &&
 				m->getAttr("transcripts")!=NULL) {
 			continue; //discard locus meta-features
+		  }
 		}
 		if (this->noPseudo) {
 			bool is_pseudo=false;
@@ -1603,9 +1605,11 @@ void GffLoader::load(GList<GenomicSeqData>& seqdata, GFFCommentParser* gf_parsec
 				continue;
 			}
 		} //pseudogene detection requested
-		char* rloc=m->getAttr("locus");
-		if (rloc!=NULL && startsWith(rloc, "RLOC_")) {
-			m->removeAttr("locus", rloc);
+		if (ignoreLocus) {
+		  char* rloc=m->getAttr("locus");
+		  if (rloc!=NULL && startsWith(rloc, "RLOC_")) {
+			 m->removeAttr("locus", rloc);
+		  }
 		}
 		if (forceExons) {
 			m->subftype_id=gff_fid_exon;
