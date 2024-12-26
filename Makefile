@@ -94,6 +94,8 @@ gffread: $(OBJS) gffread.o
 #	@echo
 #	${DBG_WARN}
 
+test tests: gffread
+	@./run_tests.sh
 
 # target for removing all object files
 

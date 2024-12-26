@@ -1,6 +1,6 @@
-# gffread -E annotation.gff -o ann_simple.gff
-# gffread v0.11.8
 ##gff-version 3
+# gffread v0.11.5
+# gffread -E annotation.gff -o ann_simple.gff
 NT_187562.1	BestRefSeq	mRNA	411	68627	.	+	.	ID=rna157470;geneID=gene55473;gene_name=MGAM
 NT_187562.1	BestRefSeq	exon	411	495	.	+	.	Parent=rna157470
 NT_187562.1	BestRefSeq	exon	1995	2051	.	+	.	Parent=rna157470
