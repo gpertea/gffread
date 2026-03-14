@@ -8,6 +8,7 @@ CXX   := $(if $(CXX),$(CXX),g++)
 LINKER  := $(if $(LINKER),$(LINKER),g++)
 
 LDFLAGS := $(if $(LDFLAGS),$(LDFLAGS),-g)
+LIBS := -lz
 
 BASEFLAGS  := -Wall -Wextra -std=c++11 ${SEARCHDIRS} -D_FILE_OFFSET_BITS=64 \
  -D_LARGEFILE_SOURCE -D_REENTRANT -fno-strict-aliasing \
@@ -22,7 +23,6 @@ CXXFLAGS := $(if $(CXXFLAGS),$(BASEFLAGS) $(CXXFLAGS),$(BASEFLAGS))
 
 ifneq (,$(filter %release %static, $(MAKECMDGOALS)))
   # -- release build
-  LIBS := 
   ifneq (,$(findstring static,$(MAKECMDGOALS)))
     LDFLAGS += -static-libstdc++ -static-libgcc
   endif
@@ -50,7 +50,7 @@ else #debug builds
        #CXXFLAGS += -fcheck-pointer-bounds -mmpx
      endif
      CXXFLAGS += -fno-common -fstack-protector
-     LIBS := -lasan -lubsan -ldl $(LIBS)
+     LIBS += -lasan -lubsan -ldl
   else
      #just plain debug build
      DEBUG_BUILD := 1
