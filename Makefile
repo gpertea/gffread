@@ -102,7 +102,7 @@ gffread.o : gff_utils.h $(GCLDIR)/GBase.h $(GCLDIR)/gff.h
 gff_utils.o : gff_utils.h $(GCLDIR)/gff.h
 ${GCLDIR}/gff.o : ${GCLDIR}/gff.h ${GCLDIR}/GFaSeqGet.h ${GCLDIR}/GList.hh
 ${GCLDIR}/GFaSeqGet.o : ${GCLDIR}/GFaSeqGet.h
-gffread: $(OBJS) gffread.o
+gffread: $(OBJS) gffread.o | gclib-init
 	${LINKER} ${LDFLAGS} -o $@ ${filter-out %.a %.so, $^} ${LIBS}
 #	@echo
 #	${DBG_WARN}
