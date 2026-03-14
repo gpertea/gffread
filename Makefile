@@ -1,4 +1,4 @@
-GCLDIR := $(if $(GCLDIR),$(GCLDIR),../gclib)
+GCLDIR := $(if $(GCLDIR),$(GCLDIR),./gclib)
 
 SEARCHDIRS := -I. -I${GCLDIR}
 
@@ -77,12 +77,25 @@ OBJS := ${GCLDIR}/GBase.o ${GCLDIR}/GArgs.o ${GCLDIR}/GFaSeqGet.o \
  ${GCLDIR}/gdna.o ${GCLDIR}/codons.o ${GCLDIR}/gff.o ${GCLDIR}/GStr.o \
  ${GCLDIR}/GFastaIndex.o gff_utils.o
  
-.PHONY : all
+.PHONY : all gclib-init
 
-all static release debug memcheck memdebug profile gprof prof: ../gclib gffread
+all static release debug memcheck memdebug profile gprof prof: gclib-init gffread
 
-../gclib:
-	git clone https://github.com/gpertea/gclib.git ../gclib
+gclib-init:
+	@if [ ! -f "${GCLDIR}/GBase.h" ]; then \
+	  if [ "${GCLDIR}" = "./gclib" ] && [ -d .git ]; then \
+	    git submodule sync -- gclib; \
+	    git submodule update --init --checkout gclib; \
+	    test -f "${GCLDIR}/GBase.h" || { \
+	      echo "Error: gclib submodule init failed"; \
+	      exit 1; \
+	    }; \
+	  else \
+	    echo "Error: ${GCLDIR}/GBase.h not found"; \
+	    echo "Hint: clone with --recurse-submodules or run: git submodule update --init gclib"; \
+	    exit 1; \
+	  fi; \
+	fi
 
 $(OBJS) : $(GCLDIR)/GBase.h $(GCLDIR)/gff.h
 gffread.o : gff_utils.h $(GCLDIR)/GBase.h $(GCLDIR)/gff.h
@@ -103,5 +116,3 @@ test tests: gffread
 clean:
 	@${RM} gffread gffread.o* gffread.exe $(OBJS)
 	@${RM} core.*
-
-

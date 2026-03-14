@@ -11,15 +11,23 @@ The official webpage with download packages for this utility can be found online
 Use `gffread -h` to see the command line usage options.
 
 ## Installation
-Building this program from source requires the [GCLib](../../../gclib) source code 
-library. The `make` command should automatically fetch the latest gclib version from the repository if no `../gclib` directory is found.
+Building this program from source requires the `gclib` core sources included as a git submodule.
 
 ```
   cd /some/build/dir
-  git clone https://github.com/gpertea/gffread
+  git clone --recurse-submodules https://github.com/gpertea/gffread
   cd gffread
   make release
 ```
-This should create the **gffread** binary in the current directory.
+Plain `git clone ...` does not fetch required submodules by default.
+If you already cloned without `--recurse-submodules`, run:
+`git submodule update --init gclib`
 
+Alternatively, running `make` in a normal git checkout will auto-initialize the
+default `./gclib` submodule when needed.
+
+If you downloaded the standalone source package `gffread-*.tar.gz`, just unpack
+it and run `make release` in the unpacked directory.
+
+This should create the **gffread** binary in the current directory.
 

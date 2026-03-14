@@ -1,0 +1,3 @@
+[submodule "gclib"]
+	path = gclib
+	url = ../gclib-core

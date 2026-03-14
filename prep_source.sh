@@ -1,21 +1,26 @@
-#!/bin/sh
+#!/usr/bin/env bash
 ver=$(fgrep '#define VERSION ' gffread.cpp)
 ver=${ver#*\"}
 ver=${ver%%\"*}
 pack=gffread-$ver
-echo " preparing souce $pack.tar.gz"
+echo " preparing source $pack.tar.gz"
 echo "----------------------------------"
-/bin/rm -rf $pack
-/bin/rm -f $pack.tar.gz
-mkdir $pack
-mkdir $pack/gclib
-libdir=$pack/gclib/
+/bin/rm -rf $pack $pack.tar.gz
+mkdir -p $pack/gclib
 
-cp LICENSE README.md gffread.cpp gff_utils.{h,cpp} $pack/
-sed 's|\.\./gclib|./gclib|' Makefile > $pack/Makefile
+cp Makefile LICENSE README.md gffread.cpp gff_utils.{h,cpp} $pack/
 
-cp ../gclib/{GVec,GList,GHashMap,khashl}.hh ../gclib/xxhash.h ../gclib/wyhash.h ../gclib/GBitVec.h $libdir
-cp ../gclib/{GArgs,GBase,gdna,GStr,gff,codons,GFaSeqGet,GFastaIndex}.{h,cpp} $libdir
+GCL=./gclib
+if [ ! -f $GCL/GBase.h ]; then
+  if [ -d .git ]; then
+    git submodule update --init gclib
+  else
+    echo "Error: $GCL/GBase.h not found"
+    exit 1
+  fi
+fi
+
+cp -p $GCL/{GVec,GList,GHashMap,khashl}.hh $GCL/{xxhash,wyhash,GBitVec}.h $pack/gclib/
+cp -p $GCL/{GArgs,GBase,gdna,GStr,gff,codons,GFaSeqGet,GFastaIndex}.{h,cpp} $pack/gclib/
 tar cvfz $pack.tar.gz $pack
 ls -l $pack.tar.gz
-
