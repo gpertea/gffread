@@ -88,7 +88,7 @@ OBJS := ${GCLDIR}/GBase.o ${GCLDIR}/GArgs.o ${GCLDIR}/GFaSeqGet.o \
  ${GCLDIR}/gdna.o ${GCLDIR}/codons.o ${GCLDIR}/gff.o ${GCLDIR}/GStr.o \
  ${GCLDIR}/GFastaIndex.o gff_utils.o
  
-.PHONY : all gclib-init strict-coords
+.PHONY : all gclib-init strict-coords large-tests
 
 all static release debug memcheck memdebug profile gprof prof: gclib-init gffread
 
@@ -124,6 +124,9 @@ gffread: gclib-init $(OBJS) gffread.o
 
 test tests: gffread
 	@./run_tests.sh
+
+large-tests: gffread
+	@./run_large_tests.sh
 
 strict-coords: gclib-init
 	@$(MAKE) --no-print-directory clean debug STRICT_COORDS=1
