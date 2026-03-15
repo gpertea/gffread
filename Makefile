@@ -1,6 +1,11 @@
 GCLDIR := $(if $(GCLDIR),$(GCLDIR),./gclib)
 
-SEARCHDIRS := -I. -I${GCLDIR}
+SEARCHDIRS := -I.
+ifdef STRICT_COORDS
+SEARCHDIRS += -isystem ${GCLDIR}
+else
+SEARCHDIRS += -I${GCLDIR}
+endif
 
 SYSTYPE :=     $(shell uname)
 
@@ -13,6 +18,12 @@ LIBS := -lz
 BASEFLAGS  := -Wall -Wextra -std=c++11 ${SEARCHDIRS} -D_FILE_OFFSET_BITS=64 \
  -D_LARGEFILE_SOURCE -D_REENTRANT -fno-strict-aliasing \
  -fno-exceptions -fno-rtti
+STRICT_CHECK_FLAGS := -Wconversion -Wsign-conversion
+STRICT_COORD_CXXFLAGS :=
+
+ifdef STRICT_COORDS
+STRICT_COORD_CXXFLAGS += $(STRICT_CHECK_FLAGS)
+endif
 
 GCCV8 := $(shell expr `${CXX} -dumpversion | cut -f1 -d.` \>= 8)
 ifeq "$(GCCV8)" "1"
@@ -77,7 +88,7 @@ OBJS := ${GCLDIR}/GBase.o ${GCLDIR}/GArgs.o ${GCLDIR}/GFaSeqGet.o \
  ${GCLDIR}/gdna.o ${GCLDIR}/codons.o ${GCLDIR}/gff.o ${GCLDIR}/GStr.o \
  ${GCLDIR}/GFastaIndex.o gff_utils.o
  
-.PHONY : all gclib-init
+.PHONY : all gclib-init strict-coords
 
 all static release debug memcheck memdebug profile gprof prof: gclib-init gffread
 
@@ -103,6 +114,7 @@ $(GCLDIR)/GBase.h $(GCLDIR)/gff.h:
 $(OBJS) : $(GCLDIR)/GBase.h $(GCLDIR)/gff.h
 gffread.o : gff_utils.h $(GCLDIR)/GBase.h $(GCLDIR)/gff.h
 gff_utils.o : gff_utils.h $(GCLDIR)/gff.h
+gff_utils.o gffread.o : CXXFLAGS += $(STRICT_COORD_CXXFLAGS)
 ${GCLDIR}/gff.o : ${GCLDIR}/gff.h ${GCLDIR}/GFaSeqGet.h ${GCLDIR}/GList.hh
 ${GCLDIR}/GFaSeqGet.o : ${GCLDIR}/GFaSeqGet.h
 gffread: gclib-init $(OBJS) gffread.o
@@ -112,6 +124,26 @@ gffread: gclib-init $(OBJS) gffread.o
 
 test tests: gffread
 	@./run_tests.sh
+
+strict-coords: gclib-init
+	@$(MAKE) --no-print-directory clean debug STRICT_COORDS=1
+	@tmp=$$(mktemp); \
+	filt=$$(mktemp); \
+	for src in gff_utils.cpp gffread.cpp; do \
+	  echo "Checking $$src with $(STRICT_CHECK_FLAGS)"; \
+	  ${CXX} -I. -isystem ${GCLDIR} -Wall -Wextra -std=c++11 -D_FILE_OFFSET_BITS=64 \
+	    -D_LARGEFILE_SOURCE -D_REENTRANT -fno-strict-aliasing -fno-exceptions -fno-rtti \
+	    -g -O0 -DDEBUG -D_DEBUG -DGDEBUG $(STRICT_CHECK_FLAGS) -fsyntax-only $$src >>$$tmp 2>&1 || true; \
+	done; \
+	rg -n "(gff_utils\\.h|gff_utils\\.cpp|gffread\\.cpp):[0-9]+:[0-9]+: (warning|error):.*(int64_t|%d)" $$tmp >$$filt || true; \
+	if [ -s $$filt ]; then \
+	  cat $$filt; \
+	  rm -f $$tmp $$filt; \
+	  echo "strict-coords: relevant coordinate/container conversion diagnostics found."; \
+	  exit 1; \
+	fi; \
+	rm -f $$tmp $$filt; \
+	echo "strict-coords: no relevant coordinate/container conversion diagnostics found."
 
 # target for removing all object files
 

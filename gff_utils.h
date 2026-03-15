@@ -172,7 +172,7 @@ class GeneInfo;
 struct CIntronData:public GSeg {
 	char strand;//'.' < '-' < '+' (reverse ASCII order)
 	GVec<GStr> ts; //list of transcript IDs sharing this intron
-	CIntronData(uint istart, uint iend, char tstrand, const char* t_id=NULL):GSeg(istart, iend),
+	CIntronData(int64_t istart, int64_t iend, char tstrand, const char* t_id=NULL):GSeg(istart, iend),
 			strand(tstrand) {
 		if (t_id!=NULL) {
 			GStr tid(t_id);
@@ -198,7 +198,7 @@ struct CIntronData:public GSeg {
 
 struct CIntronList {
 	int gseq_id;
-	uint last_t_start; //just to check if input is sorted properly!
+	int64_t last_t_start; //just to check if input is sorted properly!
 	GList<CIntronData> jlst;
 	CIntronList():gseq_id(-1),last_t_start(0), jlst(true, true) {}
 	void add(GffObj& t) { //add all introns of t to jlst
@@ -206,10 +206,10 @@ struct CIntronList {
 		if (gseq_id>=0 && gseq_id!=t.gseq_id)
 			GError("Error: CIntronList::add(%s) on different ref seq!\n", t.getID());
 		gseq_id=t.gseq_id;
-		for (int i=1;i<t.exons.Count();++i) {
+		for (int64_t i=1;i<t.exons.Count();++i) {
 		  CIntronData* nintr = new CIntronData(t.exons[i-1]->end+1,
 				  t.exons[i]->start-1, t.strand, t.getID());
-		  int fidx=-1;
+		  int64_t fidx=-1;
 		  CIntronData* xintr=jlst.AddIfNew(nintr, true, &fidx);
 		  if (xintr!=nintr) {
 			  //nintr already exists,it was deallocated
@@ -226,15 +226,15 @@ struct CIntronList {
 	void print(FILE* f) {
 		//simple tab delimited format: chr, start, end, strand, transcriptIDs comma delimited
 		const char* gseqname=GffObj::names->gseqs.getName(gseq_id);
-		for (int i=0;i<jlst.Count();++i) {
-			CIntronData& idata=*(jlst[i]);
-			fprintf(f,"%s\t%d\t%d\t%c\t",gseqname, idata.start, idata.end, idata.strand);
-			if (idata.ts.Count()>1)
-				idata.ts.Sort();
-			for (int t=0;t<idata.ts.Count();t++) {
-				if (t) fprintf(f, ",%s", idata.ts[t].chars());
-				  else fprintf(f,  "%s", idata.ts[t].chars());
-			}
+			for (int64_t i=0;i<jlst.Count();++i) {
+				CIntronData& idata=*(jlst[i]);
+				fprintf(f,"%s\t%" PRId64 "\t%" PRId64 "\t%c\t",gseqname, idata.start, idata.end, idata.strand);
+				if (idata.ts.Count()>1)
+					idata.ts.Sort();
+				for (int64_t t=0;t<idata.ts.Count();t++) {
+					if (t) fprintf(f, ",%s", idata.ts[t].chars());
+					  else fprintf(f,  "%s", idata.ts[t].chars());
+				}
 			fprintf(f, "\n");
 		}
 	}
@@ -328,10 +328,10 @@ class GeneInfo {
        gf->addAttr("Name", gene_names[0]->chars());
      } //has gene names
      GStr t(transcripts[0]->chars());
-     for (int i=1;i<transcripts.Count();i++) {
-          t.append(",");
-          t.append(transcripts[i]->chars());
-     }
+	     for (int64_t i=1;i<transcripts.Count();i++) {
+	          t.append(",");
+	          t.append(transcripts[i]->chars());
+	     }
      gf->addAttr("transcripts", t.chars());
    }
 };
@@ -339,8 +339,8 @@ class GenomicSeqData {
   int gseq_id;
  public:
   const char* gseq_name;
-  int seqreg_start; //if given by ##sequence-region comment
-  int seqreg_end;
+  int64_t seqreg_start; //if given by ##sequence-region comment
+  int64_t seqreg_end;
   GList<GffObj> gfs; //all non-transcript features -> usually gene features
   GList<GffObj> rnas; //all transcripts on this genomic sequence
   GList<GffLocus> loci; //all loci clusters
@@ -414,7 +414,7 @@ public:
          }
     const char* get_descr() {
        if (gene_names.Count()>0) {
-          for (int i=0;i<gene_names.Count();i++) {
+          for (int64_t i=0;i<gene_names.Count();i++) {
             const char* gn=getGeneDescr(gene_names.First()->chars());
             if (gn!=NULL) return gn;
             }
@@ -448,7 +448,7 @@ public:
            if (is_t) {
              start=t->exons.First()->start;
              end=t->exons.Last()->end;
-             for (int i=0;i<t->exons.Count();i++) {
+             for (int64_t i=0;i<t->exons.Count();i++) {
                seg.start=t->exons[i]->start;
                seg.end=t->exons[i]->end;
                mexons.Add(seg);
@@ -473,34 +473,34 @@ public:
         }
     }
 
-    void print(FILE *f, int idxfirstvalid, GStr& locname, GStr& loctrack) {
+    void print(FILE *f, int64_t idxfirstvalid, GStr& locname, GStr& loctrack) {
         const char* gseqname=NULL;
         if (rnas.Count()>0) gseqname=rnas[0]->getGSeqName();
         else gseqname=gfs[0]->getGSeqName();
-        fprintf(f,"%s\t%s\tlocus\t%d\t%d\t.\t%c\t.\tID=%s",
+        fprintf(f,"%s\t%s\tlocus\t%" PRId64 "\t%" PRId64 "\t.\t%c\t.\tID=%s",
                    gseqname, loctrack.chars(), this->start, this->end, this->strand,
                     locname.chars());
         //const char* loc_gname=loc.getGeneName();
         if (this->gene_names.Count()>0) { //print all gene names associated to this locus
              fprintf(f, ";genes=%s",this->gene_names.First()->chars());
-             for (int i=1;i<this->gene_names.Count();i++) {
+             for (int64_t i=1;i<this->gene_names.Count();i++) {
                fprintf(f, ",%s",this->gene_names[i]->chars());
              }
         }
         if (this->gene_ids.Count()>0) { //print all GeneIDs names associated to this locus
              fprintf(f, ";geneIDs=%s",this->gene_ids.First()->chars());
-             for (int i=1;i<this->gene_ids.Count();i++) {
+             for (int64_t i=1;i<this->gene_ids.Count();i++) {
                fprintf(f, ",%s",this->gene_ids[i]->chars());
              }
         }
         if (idxfirstvalid>=0) {
-        	GVec<int> tidx; //set of printable (non-discarded) rnas indexes
-        	for (int i=idxfirstvalid;i<this->rnas.Count();i++)
+        	GVec<int64_t> tidx; //set of printable (non-discarded) rnas indexes
+        	for (int64_t i=idxfirstvalid;i<this->rnas.Count();i++)
         		if (((GTData*)this->rnas[i]->uptr)->replaced_by==NULL)
         			tidx.Add(i);
         	if (tidx.Count()>0) {
                fprintf(f, ";transcripts=%s",this->rnas[tidx[0]]->getID());
-               for (int i=1;i<tidx.Count();i++)
+               for (int64_t i=1;i<tidx.Count();i++)
                  fprintf(f, ",%s",this->rnas[tidx[i]]->getID());
         	}
         }
@@ -510,14 +510,14 @@ public:
    void addMerge(GffLocus& locus, GffObj* lnkrna) {
      //add all the elements of the other locus (merging)
      //-- merge mexons
-     GArray<int> ovlexons(true,true); //list of locus.mexons indexes overlapping existing mexons
-     int i=0; //index of first mexons with a merge
-     int j=0; //index current mrna exon
+     GArray<int64_t> ovlexons(true,true); //list of locus.mexons indexes overlapping existing mexons
+     int64_t i=0; //index of first mexons with a merge
+     int64_t j=0; //index current mrna exon
      while (i<mexons.Count() && j<locus.mexons.Count()) {
-    	 uint istart=mexons[i].start;
-    	 uint iend=mexons[i].end;
-    	 uint jstart=locus.mexons[j].start;
-    	 uint jend=locus.mexons[j].end;
+    	 int64_t istart=mexons[i].start;
+    	 int64_t iend=mexons[i].end;
+    	 int64_t jstart=locus.mexons[j].start;
+    	 int64_t jend=locus.mexons[j].end;
     	 if (iend<jstart) { i++; continue; }
     	 if (jend<istart) { j++; continue; }
     	 ovlexons.Add(j);
@@ -527,7 +527,7 @@ public:
 			 mexons[i].end=jend;
 			 //now this could overlap the next mexon(s), so we have to merge them all
 			 while (i<mexons.Count()-1 && mexons[i].end>mexons[i+1].start) {
-				 uint nextend=mexons[i+1].end;
+				 int64_t nextend=mexons[i+1].end;
 				 mexons.Delete(i+1);
 				 if (nextend>mexons[i].end) {
 					 mexons[i].end=nextend;
@@ -539,17 +539,17 @@ public:
      }
      //-- add the rest of the non-overlapping mexons:
      GSeg seg;
-     for (int i=0;i<locus.mexons.Count();i++) {
+     for (int64_t i=0;i<locus.mexons.Count();i++) {
             seg.start=locus.mexons[i].start;
             seg.end=locus.mexons[i].end;
             if (!ovlexons.Exists(i)) mexons.Add(seg);
      }
      // -- add locus.rnas
-     for (int i=0;i<locus.rnas.Count();i++) {
+     for (int64_t i=0;i<locus.rnas.Count();i++) {
           ((GTData*)(locus.rnas[i]->uptr))->locus=this;
           if (locus.rnas[i]!=lnkrna) rnas.Add(locus.rnas[i]);
      }
-     for (int i=0;i<locus.gfs.Count();i++) {
+     for (int64_t i=0;i<locus.gfs.Count();i++) {
           ((GTData*)(locus.gfs[i]->uptr))->locus=this;
           if (locus.gfs[i]!=lnkrna) gfs.Add(locus.gfs[i]);
      }
@@ -564,8 +564,8 @@ public:
 
     bool add_gfobj(GffObj* t, bool adj) {
         //if (rnas.Count()==0) return true; //? should never be called on an empty locus
-    	uint t_start=t->start;
-    	uint t_end=t->end;
+    	int64_t t_start=t->start;
+    	int64_t t_end=t->end;
     	if (adj) {
     		t_start--;
     		t_end++;
@@ -580,14 +580,14 @@ public:
         		t->exons.First()->start--;
         		t->exons.Last()->end++;
         	}
-			int i=0; //index of first mexons with a merge
-			int j=0; //index current t exon
-			GArray<int> ovlexons(true,true); //list of mrna exon indexes overlapping mexons
+			int64_t i=0; //index of first mexons with a merge
+			int64_t j=0; //index current t exon
+			GArray<int64_t> ovlexons(true,true); //list of mrna exon indexes overlapping mexons
 			while (i<mexons.Count() && j<t->exons.Count()) {
-				uint istart=mexons[i].start;
-				uint iend=mexons[i].end;
-				uint jstart=t->exons[j]->start;
-				uint jend=t->exons[j]->end;
+				int64_t istart=mexons[i].start;
+				int64_t iend=mexons[i].end;
+				int64_t jstart=t->exons[j]->start;
+				int64_t jend=t->exons[j]->end;
 				if (iend<jstart) { i++; continue; }
 				if (jend<istart) { j++; continue; }
 				//exon overlap found if we're here:
@@ -599,7 +599,7 @@ public:
 					mexons[i].end=jend;
 					//now this could overlap the next mexon(s), so we have to merge them all
 					while (i<mexons.Count()-1 && mexons[i].end>mexons[i+1].start) {
-						uint nextend=mexons[i+1].end;
+						int64_t nextend=mexons[i+1].end;
 						mexons.Delete(i+1);
 						if (nextend>mexons[i].end) {
 							mexons[i].end=nextend;
@@ -617,7 +617,7 @@ public:
 	        if (hasovl) {
 	            GSeg seg;
 	             //add the rest of the non-overlapping exons
-	            for (int i=0;i<t->exons.Count();i++) {
+	            for (int64_t i=0;i<t->exons.Count();i++) {
 	                seg.start=t->exons[i]->start;
 	                seg.end=t->exons[i]->end;
 	                if (!ovlexons.Exists(i)) mexons.Add(seg);
@@ -629,11 +629,11 @@ public:
 	       }
         } else {
         	//gene overlap check
-			uint jstart=t->start;
-			uint jend=t->end;
-        	for (int i=0;i<mexons.Count();++i) {
-				uint istart=mexons[i].start;
-				uint iend=mexons[i].end;
+			int64_t jstart=t->start;
+			int64_t jend=t->end;
+        	for (int64_t i=0;i<mexons.Count();++i) {
+				int64_t istart=mexons[i].start;
+				int64_t iend=mexons[i].end;
 				if (iend<jstart) continue;
 				if (istart>jend) break;
 				//exon overlap found:
@@ -644,7 +644,7 @@ public:
 					mexons[i].end=jend;
 					//now this could overlap the next mexon(s), so we have to merge them all
 					while (i<mexons.Count()-1 && mexons[i].end>mexons[i+1].start) {
-						uint nextend=mexons[i+1].end;
+						int64_t nextend=mexons[i+1].end;
 						mexons.Delete(i+1);
 						if (nextend>mexons[i].end) {
 							mexons[i].end=nextend;
@@ -696,36 +696,36 @@ class GSpliceSite {
       return;
       }
     if (revc) {
-      nt[0]=toupper(ntComplement(c[1]));
-      nt[1]=toupper(ntComplement(c[0]));
+      nt[0]=(char)toupper(ntComplement(c[1]));
+      nt[1]=(char)toupper(ntComplement(c[0]));
       }
     else {
-      nt[0]=toupper(c[0]);
-      nt[1]=toupper(c[1]);
+      nt[0]=(char)toupper(c[0]);
+      nt[1]=(char)toupper(c[1]);
       }
     }
 
-  GSpliceSite(const char* intron, int intronlen, bool getAcceptor, bool revc=false) {
+  GSpliceSite(const char* intron, int64_t intronlen, bool getAcceptor, bool revc=false) {
     nt[2]=0;
     if (intron==NULL || intronlen==0)
        GError("Error: invalid intron or intron len for GSpliceSite()!\n");
     const char* c=intron;
     if (revc) {
       if (!getAcceptor) c+=intronlen-2;
-      nt[0]=toupper(ntComplement(c[1]));
-      nt[1]=toupper(ntComplement(c[0]));
+      nt[0]=(char)toupper(ntComplement(c[1]));
+      nt[1]=(char)toupper(ntComplement(c[0]));
       }
     else { //on forward strand
       if (getAcceptor) c+=intronlen-2;
-      nt[0]=toupper(c[0]);
-      nt[1]=toupper(c[1]);
+      nt[0]=(char)toupper(c[0]);
+      nt[1]=(char)toupper(c[1]);
       }//forward strand
     }
 
   GSpliceSite(const char n1, const char n2) {
     nt[2]=0;
-    nt[0]=toupper(n1);
-    nt[1]=toupper(n2);
+    nt[0]=(char)toupper(n1);
+    nt[1]=(char)toupper(n2);
     }
   bool canonicalDonor() {
     return (nt[0]=='G' && (nt[1]=='C' || nt[1]=='T'));
@@ -827,12 +827,12 @@ class GffLoader {
 	  gffnames_unref(GffObj::names);
 	  names=NULL;
   }
-  void clearHeaderLines() {
-	  if (headerLines.Count()>0) {
-		  for (int i=0;i<headerLines.Count();i++) {
-			  GFREE(headerLines[i]);
-			  headerLines[i]=NULL;
-		  }
+	  void clearHeaderLines() {
+		  if (headerLines.Count()>0) {
+			  for (int64_t i=0;i<headerLines.Count();i++) {
+				  GFREE(headerLines[i]);
+				  headerLines[i]=NULL;
+			  }
 	  }
   }
   ~GffLoader() {
@@ -842,7 +842,7 @@ class GffLoader {
 
 };
 
-void printFasta(FILE* f, GStr* defline, const char* seq, int seqlen=-1, bool useStar=false);
+void printFasta(FILE* f, GStr* defline, const char* seq, int64_t seqlen=-1, bool useStar=false);
 
 //void printTabFormat(FILE* f, GffObj* t);
 
@@ -850,8 +850,8 @@ void printFasta(FILE* f, GStr* defline, const char* seq, int seqlen=-1, bool use
 //coordinate, using quick-search; the returned int is the list index of the closest *higher*
 //GffObj - i.e. starting right *ABOVE* the given coordinate
 //Convention: returns -1 if there is no such GffObj (i.e. last GffObj starts below x)
-int qsearch_rnas(uint x, GList<GffObj>& rnas);
-int qsearch_gloci(uint x, GList<GffLocus>& loci);
+int64_t qsearch_rnas(int64_t x, GList<GffObj>& rnas);
+int64_t qsearch_gloci(int64_t x, GList<GffLocus>& loci);
 
 GffObj* redundantTranscripts(GffObj& ti, GffObj&  tj, bool matchAllIntrons=true, bool fuzzSpan=false);
 

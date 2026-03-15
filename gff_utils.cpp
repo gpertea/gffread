@@ -77,15 +77,15 @@ GStrSet<> attrList;
 
 GHash<int> isoCounter; //counts the valid isoforms
 
-void printFasta(FILE* f, GStr* defline, const char* seq, int seqlen, bool useStar) {
+void printFasta(FILE* f, GStr* defline, const char* seq, int64_t seqlen, bool useStar) {
 	//if seqlen is provided >0, seq does not have to be 0-terminated
  if (seq==NULL) return;
- int len=(seqlen>0)?seqlen:strlen(seq);
+ int64_t len=(seqlen>0)?seqlen:(int64_t)strlen(seq);
  if (len<=0) return;
  if (defline!=NULL)
      fprintf(f, ">%s\n",defline->chars());
- int ilen=0;
- for (int i=0; i < len; i++, ilen++) {
+ int64_t ilen=0;
+ for (int64_t i=0; i < len; i++, ilen++) {
    if (ilen == 70) {
      fputc('\n', f);
      ilen = 0;
@@ -97,17 +97,17 @@ void printFasta(FILE* f, GStr* defline, const char* seq, int seqlen, bool useSta
  fputc('\n', f);
 }
 
-int qsearch_gloci(uint x, GList<GffLocus>& loci) {
+int64_t qsearch_gloci(int64_t x, GList<GffLocus>& loci) {
   //binary search
   //do the simplest tests first:
   if (loci[0]->start>x) return 0;
   if (loci.Last()->start<x) return -1;
-  uint istart=0;
-  int i=0;
-  int idx=-1;
-  int maxh=loci.Count()-1;
-  int l=0;
-  int h = maxh;
+  int64_t istart=0;
+  int64_t i=0;
+  int64_t idx=-1;
+  int64_t maxh=loci.Count()-1;
+  int64_t l=0;
+  int64_t h = maxh;
   while (l <= h) {
      i = (l+h)>>1;
      istart=loci[i]->start;
@@ -130,17 +130,17 @@ int qsearch_gloci(uint x, GList<GffLocus>& loci) {
  return (idx>maxh) ? -1 : idx;
 }
 
-int qsearch_rnas(uint x, GList<GffObj>& rnas) {
+int64_t qsearch_rnas(int64_t x, GList<GffObj>& rnas) {
   //binary search
   //do the simplest tests first:
   if (rnas[0]->start>x) return 0;
   if (rnas.Last()->start<x) return -1;
-  uint istart=0;
-  int i=0;
-  int idx=-1;
-  int maxh=rnas.Count()-1;
-  int l=0;
-  int h = maxh;
+  int64_t istart=0;
+  int64_t i=0;
+  int64_t idx=-1;
+  int64_t maxh=rnas.Count()-1;
+  int64_t l=0;
+  int64_t h = maxh;
   while (l <= h) {
      i = (l+h)>>1;
      istart=rnas[i]->start;
@@ -175,9 +175,9 @@ int cmpRedundant(GffObj& a, GffObj& b) {
 
 bool tMatch(GffObj& a, GffObj& b) {
   //strict intron chain match, or single-exon perfect match
-  int imax=a.exons.Count()-1;
-  int jmax=b.exons.Count()-1;
-  int ovlen=0;
+  int64_t imax=a.exons.Count()-1;
+  int64_t jmax=b.exons.Count()-1;
+  int64_t ovlen=0;
   if (imax!=jmax) return false; //different number of introns
 
   if (imax==0) { //single-exon mRNAs
@@ -185,8 +185,8 @@ bool tMatch(GffObj& a, GffObj& b) {
       //fuzz match for single-exon transfrags:
       // it's a match if they overlap at least 80% of max len
       ovlen=a.exons[0]->overlapLen(b.exons[0]);
-      int maxlen=GMAX(a.covlen,b.covlen);
-      return (ovlen>=maxlen*0.8);
+      int64_t maxlen=GMAX(a.covlen,b.covlen);
+      return ((double)ovlen>=((double)maxlen*0.8));
     /*}
     else {
       //only exact match
@@ -199,7 +199,7 @@ bool tMatch(GffObj& a, GffObj& b) {
   //check intron overlaps
   ovlen=a.exons[0]->end-(GMAX(a.start,b.start))+1;
   ovlen+=(GMIN(a.end,b.end))-a.exons.Last()->start;
-  for (int i=1;i<=imax;i++) {
+  for (int64_t i=1;i<=imax;i++) {
     if (i<imax) ovlen+=a.exons[i]->len();
     if ((a.exons[i-1]->end!=b.exons[i-1]->end) ||
       (a.exons[i]->start!=b.exons[i]->start)) {
@@ -291,7 +291,7 @@ void printTableData(FILE* f, GffObj& g, bool inFasta) {
 	const int DBUF_LEN=1024; //there should not be attribute values larger than 1K!
 	char dbuf[DBUF_LEN];
 	char* av=NULL;
-	for(int i=0;i<tableCols.Count();i++) {
+	for (int64_t i=0;i<tableCols.Count();i++) {
 		if (i>0 || inFasta) {
      	   if (!inFasta || tableCols[i].type!=ctfGFF_ID)
      		   fprintf(f,"\t");
@@ -328,59 +328,59 @@ void printTableData(FILE* f, GffObj& g, bool inFasta) {
 		case ctfGFF_feature:
 			fprintf(f,"%s",g.getFeatureName());
 			break;
-		case ctfGFF_start:
-			fprintf(f,"%d",g.start);
-			break;
-		case ctfGFF_end:
-			fprintf(f,"%d",g.end);
-			break;
+			case ctfGFF_start:
+				fprintf(f,"%" PRId64,g.start);
+				break;
+			case ctfGFF_end:
+				fprintf(f,"%" PRId64,g.end);
+				break;
 		case ctfGFF_strand:
 			fprintf(f,"%c",g.strand);
 			break;
-		case ctfGFF_numexons:
-			fprintf(f,"%d",g.exons.Count());
-			break;
-		case ctfGFF_exons:
-			if (g.exons.Count()>0) {
-				for (int x=0;x<g.exons.Count();x++) {
-					if (x>0) fprintf(f,",");
-					fprintf(f,"%d-%d",g.exons[x]->start, g.exons[x]->end);
+			case ctfGFF_numexons:
+				fprintf(f,"%" PRId64,g.exons.Count());
+				break;
+			case ctfGFF_exons:
+				if (g.exons.Count()>0) {
+					for (int64_t x=0;x<g.exons.Count();x++) {
+						if (x>0) fprintf(f,",");
+						fprintf(f,"%" PRId64 "-%" PRId64,g.exons[x]->start, g.exons[x]->end);
+					}
+				} else fprintf(f,".");
+				break;
+			case ctfGFF_introns:
+				if (g.exons.Count()>1) {
+					for (int64_t x=0;x<g.exons.Count()-1;x++) {
+						if (x>0) fprintf(f,",");
+						fprintf(f,"%" PRId64 "-%" PRId64,g.exons[x]->end+1, g.exons[x+1]->start-1);
+					}
+				} else fprintf(f,".");
+				break;
+			case ctfGFF_cds:
+				if (g.hasCDS()) {
+					GVec<GffExon> cds;
+					g.getCDSegs(cds);
+					for (int64_t x=0;x<cds.Count();x++) {
+						if (x>0) fprintf(f,",");
+					    fprintf(f,"%" PRId64 "-%" PRId64,cds[x].start, cds[x].end);
+					}
 				}
-			} else fprintf(f,".");
-			break;
-		case ctfGFF_introns:
-			if (g.exons.Count()>1) {
-				for (int i=0;i<g.exons.Count()-1;i++) {
-					if (i>0) fprintf(f,",");
-					fprintf(f,"%d-%d",g.exons[i]->end+1, g.exons[i+1]->start-1);
+				else fprintf(f,".");
+				break;
+			case ctfGFF_covlen:
+				fprintf(f, "%" PRId64, g.covlen);
+				break;
+			case ctfGFF_cdslen:
+				if (g.hasCDS()) {
+					GVec<GffExon> cds;
+					g.getCDSegs(cds);
+					int64_t clen=0;
+					for (int64_t x=0;x<cds.Count();x++)
+					    clen+=cds[x].end-cds[x].start+1;
+					fprintf(f, "%" PRId64, clen);
 				}
-			} else fprintf(f,".");
-			break;
-		case ctfGFF_cds:
-			if (g.hasCDS()) {
-				GVec<GffExon> cds;
-				g.getCDSegs(cds);
-				for (int x=0;x<cds.Count();x++) {
-					if (x>0) fprintf(f,",");
-				    fprintf(f,"%d-%d",cds[x].start, cds[x].end);
-				}
-			}
-			else fprintf(f,".");
-			break;
-		case ctfGFF_covlen:
-			fprintf(f, "%d", g.covlen);
-			break;
-		case ctfGFF_cdslen:
-			if (g.hasCDS()) {
-				GVec<GffExon> cds;
-				g.getCDSegs(cds);
-				int clen=0;
-				for (int x=0;x<cds.Count();x++)
-				    clen+=cds[x].end-cds[x].start+1;
-				fprintf(f, "%d", clen);
-			}
-			else fprintf(f, "0");
-			break;
+				else fprintf(f, "0");
+				break;
 		} //switch
 	}
 	fprintf(f,"\n");
@@ -392,7 +392,7 @@ bool GffLoader::validateGffRec(GffObj* gffrec) {
 			TFilters=true;
 			if (gffrec->parent!=NULL && keepGenes) {
 			   GPVec<GffObj>& pchildren=gffrec->parent->children;
-			   for (int c=0;c<pchildren.Count();c++) {
+			   for (int64_t c=0;c<pchildren.Count();c++) {
 				   if (pchildren[c]==gffrec) {
 					   pchildren.Delete(c);
 					   break;
@@ -453,7 +453,7 @@ bool GffLoader::checkFilters(GffObj* gffrec) {
 			return false;
 		}
 		//check coordinates
-		if (fltRange->start || fltRange->end<UINT_MAX) {
+		if (fltRange->start || fltRange->end<INT64_MAX) {
 			if (rfltWithin) {
 				if (gffrec->start<fltRange->start || gffrec->end>fltRange->end) {
 					return false; //not within query range
@@ -488,8 +488,8 @@ bool GffLoader::checkFilters(GffObj* gffrec) {
 				return false;
 			}
 			//check coordinates
-			uint jstart=fltJunction->start;
-			uint jend=fltJunction->end;
+				int64_t jstart=fltJunction->start;
+				int64_t jend=fltJunction->end;
 			if (jstart==0) jstart=jend;
 			if (jend==0)  jend=jstart;
 			if (gffrec->start>=jstart || gffrec->end<=jend) {
@@ -497,7 +497,7 @@ bool GffLoader::checkFilters(GffObj* gffrec) {
 	        }
 
 			bool noJMatch=true;
-			for (int i=0;i<gffrec->exons.Count()-1;++i) {
+				for (int64_t i=0;i<gffrec->exons.Count()-1;++i) {
 				if (fltJunction->start && fltJunction->end) {
 					if (gffrec->exons[i]->end+1==fltJunction->start &&
 							gffrec->exons[i+1]->start-1==fltJunction->end)
@@ -561,7 +561,7 @@ bool GffLoader::process_transcript(GFastaDb& gfasta, GffObj& gffrec) {
 		else (*isonum)++;
 	   //defline.appendfmt(" gene=%s", gname);
    }
-  int seqlen=0;
+  int64_t seqlen=0;
 
   const char* tlabel=tracklabel;
   if (tlabel==NULL) tlabel=gffrec.getTrackName();
@@ -569,10 +569,10 @@ bool GffLoader::process_transcript(GFastaDb& gfasta, GffObj& gffrec) {
   char* cdsnt = NULL;
   char* cdsaa = NULL;
   int aalen=0;
-  for (int i=1;i<gffrec.exons.Count();i++) {
-     int ilen=gffrec.exons[i]->start-gffrec.exons[i-1]->end-1;
+  for (int64_t i=1;i<gffrec.exons.Count();i++) {
+     int64_t ilen=gffrec.exons[i]->start-gffrec.exons[i-1]->end-1;
      if (verbose && ilen>4000000)
-            GMessage("Warning: very large intron (%d) for transcript %s\n",
+            GMessage("Warning: very large intron (%" PRId64 ") for transcript %s\n",
                            ilen, gffrec.getID());
      if (ilen>maxintron) {
          return false;
@@ -587,18 +587,18 @@ bool GffLoader::process_transcript(GFastaDb& gfasta, GffObj& gffrec) {
   }
   if (spliceCheck && gffrec.exons.Count()>1) {
     //check introns for splice site consensi ( GT-AG, GC-AG or AT-AC )
-    int glen=gffrec.end-gffrec.start+1;
+    int64_t glen=gffrec.end-gffrec.start+1;
     const char* gseq=faseq->subseq(gffrec.start, glen);
     if (gseq==NULL) {
-    	GMessage("Error at GFF ID %s : could not retrieve subsequence %s:%d-%d !\n",
+    	GMessage("Error at GFF ID %s : could not retrieve subsequence %s:%" PRId64 "-%" PRId64 " !\n",
     			  gffrec.getID(), gffrec.getRefName(), gffrec.start, gffrec.end);
     	return false;
     }
     bool revcompl=(gffrec.strand=='-');
     bool ssValid=true;
-    for (int e=1;e<gffrec.exons.Count();e++) {
+    for (int64_t e=1;e<gffrec.exons.Count();e++) {
       const char* intron=gseq+gffrec.exons[e-1]->end+1-gffrec.start;
-      int intronlen=gffrec.exons[e]->start-gffrec.exons[e-1]->end-1;
+      int64_t intronlen=gffrec.exons[e]->start-gffrec.exons[e-1]->end-1;
       GSpliceSite acceptorSite(intron,intronlen,true, revcompl);
       GSpliceSite    donorSite(intron,intronlen, false, revcompl);
       //GMessage("%c intron %d-%d : %s .. %s\n",
@@ -634,16 +634,24 @@ bool GffLoader::process_transcript(GFastaDb& gfasta, GffObj& gffrec) {
     int strandNum=0;
     int phaseNum=0;
   CDS_CHECK:
-    uint cds_olen=0;
+    int64_t cds_olen=0;
     inframeStop=false;
     cdsnt=gffrec.getSpliced(faseq, true, &seqlen, NULL, &cds_olen, &seglst, adjustStop);
     //if adjustStop, seqlen has the CDS+3'UTR length, but cds_olen still has the original CDS length
     if (cdsnt!=NULL && cdsnt[0]!='\0') { //has CDS
-         cdsaa=translateDNA(cdsnt, aalen, seqlen);
+         if (seqlen>INT_MAX) {
+           GError("Error: sequence length too large for translateDNA(): %" PRId64 "\n", seqlen);
+         }
+         cdsaa=translateDNA(cdsnt, aalen, (int)seqlen);
          char* p=strchr(cdsaa,'.');
          int cds_aalen=aalen;
-         if (adjustStop)
-        	 cds_aalen=cds_olen/3; //originally stated CDS length
+         if (adjustStop) {
+        	 int64_t cds_aalen64=cds_olen/3; //originally stated CDS length
+        	 if (cds_aalen64>INT_MAX) {
+        		 GError("Error: CDS length too large: %" PRId64 "\n", cds_aalen64);
+        	 }
+        	 cds_aalen=(int)cds_aalen64;
+         }
          endStop=false;
          if (p!=NULL) { //stop codon found
         	 if (p-cdsaa==cds_aalen-1) { //stop found as the stated last CDS codon
@@ -663,10 +671,14 @@ bool GffLoader::process_transcript(GFastaDb& gfasta, GffObj& gffrec) {
             	  }
             	  if (adjustStop) {
             		  *p='\0';
-            		  cds_aalen=p-cdsaa+1; //adjusted CDS length
+            		  int64_t cds_aalen64=(int64_t)(p-cdsaa)+1; //adjusted CDS length
+            		  if (cds_aalen64>INT_MAX) {
+            			  GError("Error: CDS length too large: %" PRId64 "\n", cds_aalen64);
+            		  }
+            		  cds_aalen=(int)cds_aalen64;
             		  seqlen=cds_aalen*3;
             		  aalen=cds_aalen;
-            		  uint gc=seglst.gmap(seqlen);
+            		  int64_t gc=seglst.gmap(seqlen);
             		  if (gffrec.strand=='-') gffrec.CDstart=gc;
             		  else gffrec.CDend=gc;
             		  endStop=true;
@@ -679,7 +691,7 @@ bool GffLoader::process_transcript(GFastaDb& gfasta, GffObj& gffrec) {
            //in-frame stop codon found
            if (altPhases && phaseNum<3) {
               phaseNum++; //try a different phase
-              gffrec.CDphase = '0'+((mCDphase+phaseNum)%3);
+	              gffrec.CDphase = (char)('0'+((mCDphase+phaseNum)%3));
               GFREE(cdsaa);
               goto CDS_CHECK;
            }
@@ -745,22 +757,25 @@ bool GffLoader::process_transcript(GFastaDb& gfasta, GffObj& gffrec) {
 		  defline.append(gffrec.getGSeqName());
 		  defline.appendfmt("(%c)",gffrec.strand);
 		  //warning: not CDS coordinates are written here, but the exon ones
-		  defline+=(int)gffrec.start;
+		  defline.appendfmt("%" PRId64, gffrec.start);
 		  defline+=(char)'-';
-		  defline+=(int)gffrec.end;
+		  defline.appendfmt("%" PRId64, gffrec.end);
 		  // -- here these are CDS substring coordinates on the spliced sequence:
 		  defline.append(" segs:");
-		  for (int i=0;i<seglst.Count();i++) {
+		  for (int64_t i=0;i<seglst.Count();i++) {
 			  if (i>0) defline.append(",");
-			  defline+=(int)seglst[i].start;
+			  defline.appendfmt("%" PRId64, seglst[i].start);
 			  defline.append("-");
-			  defline+=(int)seglst[i].end;
+			  defline.appendfmt("%" PRId64, seglst[i].end);
 		  }
 	  }
 	  if (f_y!=NULL) { //CDS translation fasta output requested
-			 if (cdsaa==NULL) { //translate now if not done before
-			   cdsaa=translateDNA(cdsnt, aalen, seqlen);
-			 }
+				 if (cdsaa==NULL) { //translate now if not done before
+				   if (seqlen>INT_MAX) {
+					   GError("Error: sequence length too large for translateDNA(): %" PRId64 "\n", seqlen);
+				   }
+				   cdsaa=translateDNA(cdsnt, aalen, (int)seqlen);
+				 }
 			 if (aalen>0) {
 			   if (cdsaa[aalen-1]=='.' || cdsaa[aalen-1]=='\0') --aalen; //avoid printing the stop codon
  			   fprintf(f_y, ">%s", defline.chars());
@@ -787,43 +802,45 @@ bool GffLoader::process_transcript(GFastaDb& gfasta, GffObj& gffrec) {
 	  GFREE(cdsaa);
   } //writing CDS or its translation
   if (f_w!=NULL) { //write spliced exons
-	  uint cds_start=0;
-	  uint cds_end=0;
-	  seglst.Clear();
-	  int padLeft=0;
-	  int padRight=0;
-	  if (wPadding>0) {
-		padLeft= (gffrec.start>(uint)wPadding) ? wPadding : gffrec.start - 1;
-		int ediff=faseq->getseqlen()-gffrec.end;
-	    padRight=(wPadding>ediff) ?  ediff : wPadding;
-   	    gffrec.addPadding(padLeft, padRight);
-	  }
+		  int64_t cds_start=0;
+		  int64_t cds_end=0;
+		  seglst.Clear();
+		  int padLeft=0;
+		  int padRight=0;
+		  if (wPadding>0) {
+			int64_t padLeft64=(gffrec.start>(int64_t)wPadding) ? (int64_t)wPadding : gffrec.start - 1;
+			int64_t ediff64=faseq->getseqlen()-gffrec.end;
+			int64_t padRight64=((int64_t)wPadding>ediff64) ? ediff64 : (int64_t)wPadding;
+		    padLeft=(int)padLeft64;
+		    padRight=(int)padRight64;
+   	   	    gffrec.addPadding(padLeft, padRight);
+		  }
 	  char* exont=gffrec.getSpliced(faseq, false, &seqlen, &cds_start, &cds_end, &seglst);
 	  //restore exons to normal (remove padding)
 	  if (wPadding>0)
 		  gffrec.removePadding(padLeft, padRight);
 
 	  GStr defline(gffrec.getID());
-	  if (exont!=NULL) {
-		  if (!wfaNoCDS && gffrec.CDstart>0) {
-			  defline.appendfmt(" CDS=%d-%d", cds_start, cds_end);
-		  }
+		  if (exont!=NULL) {
+			  if (!wfaNoCDS && gffrec.CDstart>0) {
+				  defline.appendfmt(" CDS=%" PRId64 "-%" PRId64, cds_start, cds_end);
+			  }
 		  if (writeExonSegs) {
 			  defline.append(" loc:");
 			  defline.append(gffrec.getGSeqName());
 			  defline+=(char)'|';
-			  defline+=(int)gffrec.start;
-			  defline+=(char)'-';
-			  defline+=(int)gffrec.end;
+				  defline.appendfmt("%" PRId64, gffrec.start);
+				  defline+=(char)'-';
+				  defline.appendfmt("%" PRId64, gffrec.end);
 			  defline+=(char)'|';
 			  defline+=(char)gffrec.strand;
 			  defline.append(" exons:");
-			  for (int i=0;i<gffrec.exons.Count();i++) {
-				  if (i>0) defline.append(",");
-				  defline+=(int)gffrec.exons[i]->start;
-				  defline.append("-");
-				  defline+=(int)gffrec.exons[i]->end;
-			  }
+				  for (int64_t i=0;i<gffrec.exons.Count();i++) {
+					  if (i>0) defline.append(",");
+					  defline.appendfmt("%" PRId64, gffrec.exons[i]->start);
+					  defline.append("-");
+					  defline.appendfmt("%" PRId64, gffrec.exons[i]->end);
+				  }
 			if (wPadding>0) {
 				defline.append(" padding:");
 				defline.append(padLeft);
@@ -832,13 +849,13 @@ bool GffLoader::process_transcript(GFastaDb& gfasta, GffObj& gffrec) {
 			}
 
 			defline.append(" segs:");
-			for (int i=0;i<seglst.Count();i++) {
-				if (i>0) defline.append(",");
-				defline+=(int)seglst[i].start;
-				defline.append("-");
-				defline+=(int)seglst[i].end;
-				}
-		  }
+				for (int64_t i=0;i<seglst.Count();i++) {
+					if (i>0) defline.append(",");
+					defline.appendfmt("%" PRId64, seglst[i].start);
+					defline.append("-");
+					defline.appendfmt("%" PRId64, seglst[i].end);
+					}
+			  }
 
 		  fprintf(f_w, ">%s", defline.chars());
 		  if (fmtTable) printTableData(f_w, gffrec, true);
@@ -852,21 +869,21 @@ bool GffLoader::process_transcript(GFastaDb& gfasta, GffObj& gffrec) {
 	  }
   } //writing f_w (spliced exons)
   if (f_u!=NULL) { //write unspliced transcript sequence
-	  int padLeft=0;
-	  int padRight=0;
-	  if (wPadding>0) {
-		padLeft= (gffrec.start>(uint)wPadding) ? wPadding : gffrec.start - 1;
-		int ediff=faseq->getseqlen()-gffrec.end;
-	    padRight=(wPadding>ediff) ?  ediff : wPadding;
-	  }
-	  //char* exont=gffrec.getSpliced(faseq, false, &seqlen, &cds_start, &cds_end, &seglst);
-	  int fspan=gffrec.end-gffrec.start+1+padLeft+padRight;
-	  int fstart=gffrec.start-padLeft;
-	  const char* tseq=faseq->subseq(fstart, fspan); //non-zero-terminated
-	  //fspan will be updated with whatever was read
-	  if (tseq==NULL) {
-	        GError("Error getting transcripts seq for %s (%d : %d)!\n", gffrec.getID(), fstart, fspan);
-	  }
+		  int64_t padLeft=0;
+		  int64_t padRight=0;
+		  if (wPadding>0) {
+			padLeft= (gffrec.start>(int64_t)wPadding) ? (int64_t)wPadding : gffrec.start - 1;
+			int64_t ediff=faseq->getseqlen()-gffrec.end;
+		    padRight=((int64_t)wPadding>ediff) ?  ediff : (int64_t)wPadding;
+		  }
+		  //char* exont=gffrec.getSpliced(faseq, false, &seqlen, &cds_start, &cds_end, &seglst);
+		  int64_t fspan=gffrec.end-gffrec.start+1+padLeft+padRight;
+		  int64_t fstart=gffrec.start-padLeft;
+		  const char* tseq=faseq->subseq(fstart, fspan); //non-zero-terminated
+		  //fspan will be updated with whatever was read
+		  if (tseq==NULL) {
+		        GError("Error getting transcripts seq for %s (%" PRId64 " : %" PRId64 ")!\n", gffrec.getID(), fstart, fspan);
+		  }
 
 	  GStr defline(gffrec.getID());
 	  if (tseq!=NULL && fspan>0) {
@@ -896,18 +913,18 @@ GTData::GTData(GffObj* t, GenomicSeqData* gd):rna(t),gdata(gd), locus(NULL), rep
 bool GffLoader::unsplContained(GffObj& ti, GffObj&  tj) {
  //returns true only if ti (which MUST be single-exon) is "almost" contained in any of tj's exons
  //but it does not cross any intron-exon boundary of tj
-  int imax=ti.exons.Count()-1;
-  int jmax=tj.exons.Count()-1;
+  int64_t imax=ti.exons.Count()-1;
+  int64_t jmax=tj.exons.Count()-1;
   if (imax>0) GError("Error: bad unsplContained() call, 1st parameter must be single-exon transcript!\n");
   if (ncSpan) {
     int maxIntronOvl=dOvlSET ? 25 : 0;
     //int minovl = dOvlSET ? 5 : (int)(0.8 * ti.len()); //minimum overlap to declare "redundancy"
-    for (int j=0;j<=jmax;j++) {
+    for (int64_t j=0;j<=jmax;j++) {
        bool exonOverlap=false;
        if (dOvlSET) {
     	   exonOverlap= (tj.exons[j]->overlapLen(ti.start-1, ti.end+1) > 0);
        } else {
-    	   exonOverlap=(ti.overlapLen(tj.exons[j])>=0.8 * ti.len());
+    	   exonOverlap=((double)ti.overlapLen(tj.exons[j])>=(0.8 * (double)ti.len()));
        }
        if (exonOverlap) {
           //must not overlap the introns
@@ -918,7 +935,7 @@ bool GffLoader::unsplContained(GffObj& ti, GffObj&  tj) {
        }
     } //for each exon
   } else { // not fuzzSpan, strict containment required
-    for (int j=0;j<=jmax;j++) {
+    for (int64_t j=0;j<=jmax;j++) {
         if (ti.end<=tj.exons[j]->end && ti.start>=tj.exons[j]->start)
           return true;
     }
@@ -944,8 +961,8 @@ GffObj* GffLoader::redundantTranscripts(GffObj& ti, GffObj&  tj) {
  int adj=dOvlSET ? 1 : 0;
  if (ti.start>tj.end+adj || tj.start>ti.end+adj ||
 		 (tj.strand!='.' && ti.strand!='.' && tj.strand!=ti.strand)) return NULL; //no span overlap
- int imax=ti.exons.Count()-1;
- int jmax=tj.exons.Count()-1;
+ int64_t imax=ti.exons.Count()-1;
+ int64_t jmax=tj.exons.Count()-1;
  GffObj* bigger=NULL;
  GffObj* smaller=NULL;
  if (matchAllIntrons) { //full intron chain match expected, or full containment for SET
@@ -961,14 +978,14 @@ GffObj* GffLoader::redundantTranscripts(GffObj& ti, GffObj&  tj) {
          return NULL; //no containment
    }
    //check that all introns really match
-   for (int i=0;i<imax;i++) {
+   for (int64_t i=0;i<imax;i++) {
      if (ti.exons[i]->end!=tj.exons[i]->end ||
          ti.exons[i+1]->start!=tj.exons[i+1]->start) return NULL;
      }
    return bigger;
  }
  //--- matchAllIntrons==false: intron-chain containment is also considered redundancy
- int minlen=0;
+ int64_t minlen=0;
  if (ti.covlen>tj.covlen) {
       if (tj.exons.Count()>ti.exons.Count()) {
           //exon count override
@@ -998,7 +1015,7 @@ GffObj* GffLoader::redundantTranscripts(GffObj& ti, GffObj&  tj) {
        if (dOvlSET) {
            return (ti.exons[0]->overlapLen(tj.exons[0]->start-1, tj.exons[0]->end+1)>0) ? bigger : NULL;
        } else {
-          return (ti.exons[0]->overlapLen(tj.exons[0])>=minlen*0.8) ? bigger : NULL;
+          return ((double)ti.exons[0]->overlapLen(tj.exons[0])>=((double)minlen*0.8)) ? bigger : NULL;
        }
      } else { //boundary containment required
        return (smaller->start>=bigger->start && smaller->end<=bigger->end) ? bigger : NULL;
@@ -1016,9 +1033,9 @@ GffObj* GffLoader::redundantTranscripts(GffObj& ti, GffObj&  tj) {
      tj.exons[jmax]->start<ti.exons[0]->end )
          return NULL; //intron chains do not overlap at all
  //checking full intron chain containment
- uint eistart=0, eiend=0, ejstart=0, ejend=0; //exon boundaries
- int i=1; //exon idx to the right of the current intron of ti
- int j=1; //exon idx to the right of the current intron of tj
+ int64_t eistart=0, eiend=0, ejstart=0, ejend=0; //exon boundaries
+ int64_t i=1; //exon idx to the right of the current intron of ti
+ int64_t j=1; //exon idx to the right of the current intron of tj
  //find the first intron overlap:
  while (i<=imax && j<=jmax) {
     eistart=ti.exons[i-1]->end;
@@ -1082,9 +1099,9 @@ int gseqCmpName(const pointer p1, const pointer p2) {
 
 void printLocus(GffLocus* loc, const char* pre) {
   if (pre!=NULL) fprintf(stderr, "%s", pre);
-  GMessage(" [%d-%d] : ", loc->start, loc->end);
+  GMessage(" [%" PRId64 "-%" PRId64 "] : ", loc->start, loc->end);
   GMessage("%s",loc->rnas[0]->getID());
-  for (int i=1;i<loc->rnas.Count();i++) {
+  for (int64_t i=1;i<loc->rnas.Count();i++) {
     GMessage(",%s",loc->rnas[i]->getID());
     }
   GMessage("\n");
@@ -1123,7 +1140,7 @@ bool GffLoader::placeGf(GffObj* t, GenomicSeqData* gdata) {
   //GMessage("DBG>>Placing transcript %s(%d-%d, %d exons)\n", t->getID(), t->start, t->end, t->exons.Count());
 
   if (t->parent==NULL && t->isTranscript() && trAdoption) {
-  	int gidx=gdata->gfs.Count()-1;
+  	int64_t gidx=gdata->gfs.Count()-1;
   	while (gidx>=0 && gdata->gfs[gidx]->end>=t->start) {
   		GffObj& g = *(gdata->gfs[gidx]);
   		//try to find a container gene object for this transcript
@@ -1214,13 +1231,13 @@ bool GffLoader::placeGf(GffObj* t, GenomicSeqData* gdata) {
        return true; //new locus on this ref seq
   }
   //--- look for any existing loci overlapping t
-  uint t_end=t->end;
-  uint t_start=t->start;
+  int64_t t_end=t->end;
+  int64_t t_start=t->start;
   if (dOvlSET) {
 	  t_end++;
 	  t_start--;
   }
-  int nidx=qsearch_gloci(t_end, gdata->loci); //get index of nearest locus starting just ABOVE t->end
+  int64_t nidx=qsearch_gloci(t_end, gdata->loci); //get index of nearest locus starting just ABOVE t->end
   //GMessage("\tlooking up end coord %d in gdata->loci.. (qsearch got nidx=%d)\n", t->end, nidx);
   if (nidx==0) {
      //cannot have any overlapping loci
@@ -1229,11 +1246,11 @@ bool GffLoader::placeGf(GffObj* t, GenomicSeqData* gdata) {
      return true;
   }
   if (nidx==-1) nidx=gdata->loci.Count();//all loci start below t->end
-  int lfound=0; //count of parent loci
-  GArray<int> mrgloci(false);
+  int64_t lfound=0; //count of parent loci
+  GArray<int64_t> mrgloci(false);
   GList<GffLocus> tloci(true); //candidate parent loci to adopt this
   //if (debug) GMessage("\tchecking all loci from %d to 0\n",nidx-1);
-  for (int l=nidx-1;l>=0;l--) {
+  for (int64_t l=nidx-1;l>=0;l--) {
       GffLocus& loc=*(gdata->loci[l]);
       if ((loc.strand=='+' || loc.strand=='-') && t->strand!='.'&& loc.strand!=t->strand) continue;
       if (t_start>loc.end) {
@@ -1252,7 +1269,7 @@ bool GffLoader::placeGf(GffObj* t, GenomicSeqData* gdata) {
          mrgloci.Add(l);
          if (collapseRedundant && !noexon_gfs) {
            //compare to every single transcript in this locus
-           for (int ti=0;ti<loc.rnas.Count();ti++) {
+           for (int64_t ti=0;ti<loc.rnas.Count();ti++) {
                  if (loc.rnas[ti]==t) continue;
                  GTData* odata=(GTData*)(loc.rnas[ti]->uptr);
                  //GMessage("  ..redundant check vs overlapping transcript %s\n",loc.rnas[ti]->getID());
@@ -1274,15 +1291,15 @@ bool GffLoader::placeGf(GffObj* t, GenomicSeqData* gdata) {
   } //for each existing locus
   if (lfound==0) {
       //overlapping loci not found, create a locus with only this mRNA
-      int addidx=gdata->loci.Add(new GffLocus(t));
+      int64_t addidx=gdata->loci.Add(new GffLocus(t));
       if (addidx<0) {
          //should never be the case!
-         GMessage("  WARNING: new GffLocus(%s:%d-%d) not added!\n",t->getID(), t->start, t->end);
+         GMessage("  WARNING: new GffLocus(%s:%" PRId64 "-%" PRId64 ") not added!\n",t->getID(), t->start, t->end);
       }
    }
    else { //found at least one overlapping locus
      lfound--;
-     int locidx=mrgloci[lfound];
+     int64_t locidx=mrgloci[lfound];
      GffLocus& loc=*(gdata->loci[locidx]);
      //last locus index found is also the smallest index
      if (lfound>0) {
@@ -1290,13 +1307,13 @@ bool GffLoader::placeGf(GffObj* t, GenomicSeqData* gdata) {
        /* if (debug)
           GMessage(" merging %d loci \n",lfound);
        */
-       for (int l=0;l<lfound;l++) {
-          int mlidx=mrgloci[l];
+       for (int64_t l=0;l<lfound;l++) {
+          int64_t mlidx=mrgloci[l];
           loc.addMerge(*(gdata->loci[mlidx]), t);
           gdata->loci.Delete(mlidx); //highest indices first, so it's safe to remove
        }
      }
-     int i=locidx;
+     int64_t i=locidx;
      while (i>0 && loc<*(gdata->loci[i-1])) {
        //bubble down until it's in the proper order
        i--;
@@ -1308,15 +1325,15 @@ bool GffLoader::placeGf(GffObj* t, GenomicSeqData* gdata) {
 
 void collectLocusData(GList<GenomicSeqData>& ref_data, bool covInfo) {
 	int locus_num=0;
-	for (int g=0;g<ref_data.Count();g++) {
+	for (int64_t g=0;g<ref_data.Count();g++) {
 		GenomicSeqData* gdata=ref_data[g];
-		for (int l=0;l<gdata->loci.Count();l++) {
+		for (int64_t l=0;l<gdata->loci.Count();l++) {
 			GffLocus& loc=*(gdata->loci[l]);
 			GHash<int> gnames; //gene names in this locus
 			//GHash<int> geneids(true); //Entrez GeneID: numbers
 			GHash<int> geneids;
 			int fstrand=0,rstrand=0,ustrand=0;
-			for (int i=0;i<loc.rnas.Count();i++) {
+			for (int64_t i=0;i<loc.rnas.Count();i++) {
 				GffObj& t=*(loc.rnas[i]);
 				char tstrand=(char) T_OSTRAND(t.udata);
 				if (tstrand==0) tstrand=t.strand;
@@ -1358,7 +1375,7 @@ void collectLocusData(GList<GenomicSeqData>& ref_data, bool covInfo) {
             		 (fstrand==0 && rstrand==0)) loc.strand='.';
             else if (fstrand==0 && rstrand>0) loc.strand='-';
             else loc.strand='+';
-			for (int i=0;i<loc.gfs.Count();i++) {
+				for (int64_t i=0;i<loc.gfs.Count();i++) {
 				GffObj& nt=*(loc.gfs[i]);
 				if (nt.isGene()) {
 					GStr gname(nt.getGeneName());
@@ -1394,12 +1411,12 @@ void collectLocusData(GList<GenomicSeqData>& ref_data, bool covInfo) {
 				*/
 			}//for each non-transcript (genes?)
 			if (covInfo) {
-				for (int m=0;m<loc.mexons.Count();m++) {
+				for (int64_t m=0;m<loc.mexons.Count();m++) {
 					if (loc.strand=='+')
-						gdata->f_bases+=loc.mexons[m].len();
+						gdata->f_bases+=(uint64)loc.mexons[m].len();
 					else if (loc.strand=='-')
-						gdata->r_bases+=loc.mexons[m].len();
-					else gdata->u_bases+=loc.mexons[m].len();
+						gdata->r_bases+=(uint64)loc.mexons[m].len();
+					else gdata->u_bases+=(uint64)loc.mexons[m].len();
 				}
 			}
 			locus_num++;
@@ -1449,7 +1466,7 @@ void GffLoader::loadRefNames(GStr& flst) {
 }
 
 GenomicSeqData* getGSeqData(GList<GenomicSeqData>& seqdata, int gseq_id) {
-	int i=-1;
+	int64_t i=-1;
 	GenomicSeqData f(gseq_id);
 	GenomicSeqData* gdata=NULL;
 	if (seqdata.Found(&f,i)) gdata=seqdata[i];
@@ -1471,9 +1488,9 @@ void GffLoader::collectIntrons(GffObj& t) {
         	intronList.print(f_j);
         	intronList.clear();
          }
-         else if (t.start<intronList.last_t_start)
-        	 GError("Error collectIntrons(%s) called when last_t_start was %d\n",
-        			 t.getID(), intronList.last_t_start );
+	         else if (t.start<intronList.last_t_start)
+	        	 GError("Error collectIntrons(%s) called when last_t_start was %" PRId64 "\n",
+	        			 t.getID(), intronList.last_t_start );
          //add this transcript's introns
 	}
     intronList.add(t);
@@ -1531,14 +1548,14 @@ void GffLoader::load(GList<GenomicSeqData>& seqdata, GFFCommentParser* gf_parsec
 
 	if (this->noPseudo) {
 		GffNameList& fnames = GffObj::names->feats; //gffr->names->feats;
-		for (int i=0;i<fnames.Count();i++) {
+		for (int64_t i=0;i<fnames.Count();i++) {
 			char* n=fnames[i]->name;
 			if (startsWith(n, "pseudo")) {
 				pseudoFeatureIds.Add(fnames[i]->idx);
 			}
 		}
 		GffNameList& attrnames = GffObj::names->attrs;//gffr->names->attrs;
-		for (int i=0;i<attrnames.Count();i++) {
+		for (int64_t i=0;i<attrnames.Count();i++) {
 			char* n=attrnames[i]->name;
 			if (endsiWith(n, "type")) {
 				pseudoTypeAttrIds.Add(attrnames[i]->idx);
@@ -1552,9 +1569,9 @@ void GffLoader::load(GList<GenomicSeqData>& seqdata, GFFCommentParser* gf_parsec
 		}
 	}
 
-	if (verbose) GMessage("   .. loaded %d genomic features from %s\n", gffr->gflst.Count(), fname.chars());
+	if (verbose) GMessage("   .. loaded %" PRId64 " genomic features from %s\n", gffr->gflst.Count(), fname.chars());
 	//add to GenomicSeqData, adding to existing loci and identifying intron-chain duplicates
-	for (int k=0;k<gffr->gflst.Count();k++) {
+	for (int64_t k=0;k<gffr->gflst.Count();k++) {
 		GffObj* m=gffr->gflst[k];
 		if (ignoreLocus) {
 		   if (strcmp(m->getFeatureName(), "locus")==0 &&
@@ -1564,7 +1581,7 @@ void GffLoader::load(GList<GenomicSeqData>& seqdata, GFFCommentParser* gf_parsec
 		}
 		if (this->noPseudo) {
 			bool is_pseudo=false;
-			for (int i=0;i<pseudoFeatureIds.Count();++i) {
+			for (int64_t i=0;i<pseudoFeatureIds.Count();++i) {
 				if (pseudoFeatureIds[i]==m->ftype_id) {
 					is_pseudo=true;
 					break;
@@ -1574,11 +1591,11 @@ void GffLoader::load(GList<GenomicSeqData>& seqdata, GFFCommentParser* gf_parsec
 				if (verbose) warnPseudo(*m);
 				continue;
 			}
-			for (int i=0;i<pseudoAttrIds.Count();++i) {
+			for (int64_t i=0;i<pseudoAttrIds.Count();++i) {
 				char* attrv=NULL;
 				if (m->attrs!=NULL) attrv=m->attrs->getAttr(pseudoAttrIds[i]);
 				if (attrv!=NULL) {
-					char fc=tolower(attrv[0]);
+						char fc=(char)tolower(attrv[0]);
 					if (fc=='t' || fc=='y' || fc=='1') {
 						is_pseudo=true;
 						break;
@@ -1591,7 +1608,7 @@ void GffLoader::load(GList<GenomicSeqData>& seqdata, GFFCommentParser* gf_parsec
 			}
 			//  *type=*_pseudogene
             //find all attributes ending with _type and have value like: *_pseudogene
-			for (int i=0;i<pseudoTypeAttrIds.Count();++i) {
+			for (int64_t i=0;i<pseudoTypeAttrIds.Count();++i) {
 				char* attrv=NULL;
 				if (m->attrs!=NULL) attrv=m->attrs->getAttr(pseudoTypeAttrIds[i]);
 				if (attrv!=NULL &&

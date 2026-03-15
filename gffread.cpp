@@ -170,7 +170,7 @@ void loadIDlist(FILE* f, GStrSet<> & idhash) {
       if (line[0]=='#') continue; //skip comments
       GDynArray<char*> ids;
       strsplit(line, ids);
-      for (uint i=0;i<ids.Count();i++) {
+      for (int64_t i=0;i<ids.Count();i++) {
     	  if (strlen(ids[i])>0)
     		  idhash.Add(ids[i]);
       }
@@ -314,8 +314,8 @@ void printGff3Header(FILE* f, GArgs& args) {
 
 void printGSeqHeader(FILE* f, GenomicSeqData* gdata) {
 if (f && gffloader.keepGff3Comments && gdata->seqreg_start>0 && gdata->seqreg_end>0)
-	 fprintf(f, "##sequence-region %s %d %d\n", gdata->gseq_name,
-			 gdata->seqreg_start, gdata->seqreg_end);
+		 fprintf(f, "##sequence-region %s %" PRId64 " %" PRId64 "\n", gdata->gseq_name,
+				 gdata->seqreg_start, gdata->seqreg_end);
 
 }
 
@@ -721,8 +721,8 @@ int main(int argc, char* argv[]) {
      GenomicSeqData* gdata=g_data[g];
      bool firstGSeqHeader=fmtGFF3;
      if (f_out && fmtGFF3 && gffloader.keepGff3Comments && gdata->seqreg_start>0)
-    	 fprintf(f_out, "##sequence-region %s %d %d\n", gdata->gseq_name,
-    			 gdata->seqreg_start, gdata->seqreg_end);
+	    	 fprintf(f_out, "##sequence-region %s %" PRId64 " %" PRId64 "\n", gdata->gseq_name,
+	    			 gdata->seqreg_start, gdata->seqreg_end);
      for (int l=0;l<gdata->loci.Count();l++) {
        bool firstLocusPrint=true;
        GffLocus& loc=*(gdata->loci[l]);
@@ -751,7 +751,7 @@ int main(int argc, char* argv[]) {
             continue;
          }
          //restore strand for dOvlSET
-         char orig_strand=T_OSTRAND(t.udata);
+         char orig_strand=(char)T_OSTRAND(t.udata);
          if (orig_strand!=0) t.strand=orig_strand;
          /* -- transcripts are filtered upon loading
          if (process_transcript(gfasta, t)) {
@@ -890,5 +890,4 @@ int main(int argc, char* argv[]) {
  if (f_repl && f_repl!=stdout) fclose(f_repl);
  shutDown();
  }
-
 
