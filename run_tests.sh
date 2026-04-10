@@ -69,6 +69,26 @@ for (( i=0; i<${#arr_ins[@]}; i++ )); do
   done
   echo "---------------------------------"
 done
+
+echo ">>> Running stack-smash regression test"
+sm_out=$(mktemp)
+sm_err=$(mktemp)
+sm_cmd="$prog stack_smash_test.gff"
+echo "   $sm_cmd"
+"$prog" stack_smash_test.gff >"$sm_out" 2>"$sm_err"
+sm_rc=$?
+if ((sm_rc != 0)); then
+  echo " ERROR: regression test command failed with exit code $sm_rc"
+  ((tfailed++))
+elif grep -q "stack smashing detected" "$sm_err"; then
+  echo " ERROR: stack smashing regression detected!"
+  ((tfailed++))
+else
+  echo " OK."
+fi
+rm -f "$sm_out" "$sm_err"
+echo "---------------------------------"
+
 if ((tfailed > 0)); then
   echo "Error: $tfailed tests failed!"
 else
