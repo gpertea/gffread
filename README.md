@@ -10,6 +10,12 @@ The official webpage with download packages for this utility can be found online
 
 Use `gffread -h` to see the command line usage options.
 
+The genomic sequence given with `-g` may be a plain FASTA file or a
+**BGZF-compressed** FASTA (`-g genome.fa.gz`), as long as the matching `.fai`
+and `.gzi` index files are present next to it (as produced by `samtools faidx`,
+`bgzip -r`, or the bundled `gclib/gclib-test bgzip` helper). BGZF support is
+self-contained (built on zlib); it does not require htslib or samtools.
+
 ## Installation
 Building this program from source requires the `gclib` core sources included as a git submodule.
 

@@ -6,13 +6,15 @@ err_exit() {
 }
 
 prog="./gffread"
+gclibtest="./gclib/gclib-test"
 shift_bases=5368709120
 srcdir="examples"
 expdir="examples/exp_out"
 wrkdir="examples/wrk"
 generated_files=(
- "$wrkdir/genome_large.fa"
- "$wrkdir/genome_large.fa.fai"
+ "$wrkdir/genome_large.fa.gz"
+ "$wrkdir/genome_large.fa.gz.gzi"
+ "$wrkdir/genome_large.fa.gz.fai"
  "$wrkdir/annotation_large.gff"
  "$wrkdir/annotation_large.gtf"
  "$wrkdir/annotation_large.gtf.expected"
@@ -28,6 +30,9 @@ generated_files=(
 
 if [[ ! -x $prog ]]; then
  make -j4 gffread || err_exit "Build failed."
+fi
+if [[ ! -x $gclibtest ]]; then
+ make -C gclib -j4 gclib-test || err_exit "Build of gclib-test (bgzip helper) failed."
 fi
 
 [[ -d "$srcdir" ]] || err_exit "'$srcdir' must exist in current directory"
@@ -97,9 +102,14 @@ shift_cds_expected() {
  ' "$infile" > "$outfile" || err_exit "could not create $outfile"
 }
 
+# Build a large-offset genome and store it BGZF-compressed (never materializing
+# the multi-GB plain FASTA): the mostly-'N' sequence is streamed straight into
+# our bgzip helper, which also writes the companion .gzi (block index) and .fai
+# (record index with uncompressed offsets). This exercises 64-bit coordinates
+# through BGZF random access while keeping the on-disk fixture only a few MB.
 generate_large_fasta() {
  local infile="$1"
- local outfile="$2"
+ local outgz="$2"
  local seqname=""
  local line_len=""
  local full_lines=0
@@ -121,7 +131,7 @@ generate_large_fasta() {
     fi
     tail -n +2 "$infile" | tr -d '\n'
   } | fold -w "$line_len"
- } > "$outfile" || err_exit "could not create $outfile"
+ } | "$gclibtest" bgzip - "$outgz" || err_exit "could not create $outgz"
 }
 
 run_cmd() {
@@ -146,7 +156,7 @@ compare_files() {
 }
 
 echo "=== Building large-offset fixtures from committed example data"
-generate_large_fasta "$srcdir/genome.fa" "$wrkdir/genome_large.fa"
+generate_large_fasta "$srcdir/genome.fa" "$wrkdir/genome_large.fa.gz"
 shift_feature_file "$srcdir/annotation.gff" "$wrkdir/annotation_large.gff"
 shift_feature_file "$expdir/annotation.gtf" "$wrkdir/annotation_large.gtf.expected"
 shift_table_expected "$expdir/annotation.tbl" "$wrkdir/annotation_large.tbl.expected"
@@ -156,19 +166,19 @@ run_cmd "large test 2" -T -o "$wrkdir/annotation_large.gtf" "$wrkdir/annotation_
 compare_files "large test 2" "$wrkdir/annotation_large.gtf" "$wrkdir/annotation_large.gtf.expected"
 echo "---------------------------------"
 
-run_cmd "large test 3" -g "$wrkdir/genome_large.fa" -w "$wrkdir/transcripts_large.fa" "$wrkdir/annotation_large.gff"
+run_cmd "large test 3" -g "$wrkdir/genome_large.fa.gz" -w "$wrkdir/transcripts_large.fa" "$wrkdir/annotation_large.gff"
 compare_files "large test 3" "$wrkdir/transcripts_large.fa" "$expdir/transcripts.fa"
 echo "---------------------------------"
 
-run_cmd "large test 4" -W -g "$wrkdir/genome_large.fa" -x "$wrkdir/transcripts_CDS_large.fa" "$wrkdir/annotation_large.gff"
+run_cmd "large test 4" -W -g "$wrkdir/genome_large.fa.gz" -x "$wrkdir/transcripts_CDS_large.fa" "$wrkdir/annotation_large.gff"
 compare_files "large test 4" "$wrkdir/transcripts_CDS_large.fa" "$wrkdir/transcripts_CDS_large.expected.fa"
 echo "---------------------------------"
 
-run_cmd "large test 5" -g "$wrkdir/genome_large.fa" -y "$wrkdir/transcripts_prot_large.fa" "$wrkdir/annotation_large.gff"
+run_cmd "large test 5" -g "$wrkdir/genome_large.fa.gz" -y "$wrkdir/transcripts_prot_large.fa" "$wrkdir/annotation_large.gff"
 compare_files "large test 5" "$wrkdir/transcripts_prot_large.fa" "$expdir/transcripts_prot.fa"
 echo "---------------------------------"
 
-run_cmd "large test 6" -g "$wrkdir/genome_large.fa" -w "$wrkdir/transcripts_large2.fa" -y "$wrkdir/transcripts_prot_large2.fa" "$wrkdir/annotation_large.gff"
+run_cmd "large test 6" -g "$wrkdir/genome_large.fa.gz" -w "$wrkdir/transcripts_large2.fa" -y "$wrkdir/transcripts_prot_large2.fa" "$wrkdir/annotation_large.gff"
 compare_files "large test 6 -w" "$wrkdir/transcripts_large2.fa" "$expdir/transcripts.fa"
 compare_files "large test 6 -y" "$wrkdir/transcripts_prot_large2.fa" "$expdir/transcripts_prot.fa"
 echo "---------------------------------"

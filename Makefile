@@ -86,7 +86,7 @@ endif
 
 OBJS := ${GCLDIR}/GBase.o ${GCLDIR}/GArgs.o ${GCLDIR}/GFaSeqGet.o \
  ${GCLDIR}/gdna.o ${GCLDIR}/codons.o ${GCLDIR}/gff.o ${GCLDIR}/GStr.o \
- ${GCLDIR}/GFastaIndex.o gff_utils.o
+ ${GCLDIR}/GFastaIndex.o ${GCLDIR}/GBgzf.o gff_utils.o
  
 .PHONY : all gclib-init strict-coords large-tests
 
@@ -116,7 +116,8 @@ gffread.o : gff_utils.h $(GCLDIR)/GBase.h $(GCLDIR)/gff.h
 gff_utils.o : gff_utils.h $(GCLDIR)/gff.h
 gff_utils.o gffread.o : CXXFLAGS += $(STRICT_COORD_CXXFLAGS)
 ${GCLDIR}/gff.o : ${GCLDIR}/gff.h ${GCLDIR}/GFaSeqGet.h ${GCLDIR}/GList.hh
-${GCLDIR}/GFaSeqGet.o : ${GCLDIR}/GFaSeqGet.h
+${GCLDIR}/GFaSeqGet.o : ${GCLDIR}/GFaSeqGet.h ${GCLDIR}/GBgzf.h
+${GCLDIR}/GBgzf.o : ${GCLDIR}/GBgzf.h
 gffread: gclib-init $(OBJS) gffread.o
 	${LINKER} ${LDFLAGS} -o $@ $(OBJS) gffread.o ${LIBS}
 #	@echo

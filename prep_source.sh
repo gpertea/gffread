@@ -21,6 +21,6 @@ if [ ! -f $GCL/GBase.h ]; then
 fi
 
 cp -p $GCL/{GVec,GList,GHashMap,khashl}.hh $GCL/{xxhash,wyhash,GBitVec}.h $pack/gclib/
-cp -p $GCL/{GArgs,GBase,gdna,GStr,gff,codons,GFaSeqGet,GFastaIndex}.{h,cpp} $pack/gclib/
+cp -p $GCL/{GArgs,GBase,gdna,GStr,gff,codons,GFaSeqGet,GFastaIndex,GBgzf}.{h,cpp} $pack/gclib/
 tar cvfz $pack.tar.gz $pack
 ls -l $pack.tar.gz

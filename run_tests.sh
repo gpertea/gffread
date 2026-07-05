@@ -69,6 +69,26 @@ for (( i=0; i<${#arr_ins[@]}; i++ )); do
   done
   echo "---------------------------------"
 done
+# --- BGZF-compressed genome test: extract spliced transcripts from a bgzipped
+#     genome and confirm the output matches the plain-genome golden file.
+echo ">>> Running BGZF test (compressed -g genome)"
+gclibtest="../gclib/gclib-test"
+if [[ ! -x $gclibtest ]]; then
+  ( cd .. && make -C gclib -j4 gclib-test ) || err_exit "Build of gclib-test failed."
+fi
+"$gclibtest" bgzip genome.fa genome_bgz.fa.gz || err_exit "bgzip of genome.fa failed"
+cmd="$prog -g genome_bgz.fa.gz -w transcripts_bgz.fa annotation.gff"
+echo "   $cmd"
+eval "$cmd" || err_exit "Command failed: $cmd"
+if diff -q -I '^#' transcripts_bgz.fa exp_out/transcripts.fa &>/dev/null; then
+  echo " OK."
+else
+  echo " ERROR: BGZF genome output differs from expected!"
+  ((tfailed++))
+fi
+rm -f genome_bgz.fa.gz genome_bgz.fa.gz.gzi genome_bgz.fa.gz.fai transcripts_bgz.fa
+echo "---------------------------------"
+
 if ((tfailed > 0)); then
   echo "Error: $tfailed tests failed!"
 else
