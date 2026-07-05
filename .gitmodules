@@ -1,3 +1,4 @@
 [submodule "gclib"]
 	path = gclib
 	url = ../gclib-core
+	branch = master
