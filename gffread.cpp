@@ -196,7 +196,7 @@ void loadSeqInfo(FILE* f, GHash<SeqInfo*> &si) {
       if (*p!=0) { *p=0;p++; }
       while (*p==' ' || *p=='\t') p++;
       if (*p!=0) text=p; //else text remains NULL
-      int len=0;
+      int64_t len=0;
       if (!parseInt(lenstr,len)) {
          GMessage("Warning: could not parse sequence length: %s %s\n",
                   id, lenstr);
@@ -334,8 +334,8 @@ void processGffComment(const char* cmline, GfList* gflst) {
 		 int gseq_id=gffloader.names->gseqs.addName(chr.chars());
 		 if (gseq_id>=0) {
 			 GenomicSeqData* gseqdata=getGSeqData(g_data, gseq_id);
-			 gseqdata->seqreg_start=w.asInt();
-			 gseqdata->seqreg_end=wend.asInt();
+			 gseqdata->seqreg_start=w.asInt64();
+			 gseqdata->seqreg_end=wend.asInt64();
 		 }
 		 else GError("Error adding ref seq ID %s\n", chr.chars());
 	 }
@@ -575,7 +575,7 @@ int main(int argc, char* argv[]) {
  if (sz) {
 	fltRange=new GRangeParser(sz);
  	if (fltRange->end==0) //end coordinate not given
- 		fltRange->end=UINT_MAX;
+ 		fltRange->end=INT64_MAX;
  } else {
    if (rfltWithin)
      GError("Error: option -R requires -r!\n");

@@ -97,9 +97,9 @@ extern GRangeParser* fltJunction;
 
 class SeqInfo { //populated from the -s option of gffread
  public:
-  int len;
+  int64_t len;
   char* descr;
-  SeqInfo( int l, char* s): len(l), descr(NULL) {
+  SeqInfo( int64_t l, char* s): len(l), descr(NULL) {
     if (s!=NULL)
       descr=Gstrdup(s);
   }

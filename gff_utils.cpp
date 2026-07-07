@@ -568,7 +568,7 @@ bool GffLoader::process_transcript(GFastaDb& gfasta, GffObj& gffrec) {
   //defline.appendfmt(" track:%s",tlabel);
   char* cdsnt = NULL;
   char* cdsaa = NULL;
-  int aalen=0;
+  int64_t aalen=0;
   for (int64_t i=1;i<gffrec.exons.Count();i++) {
      int64_t ilen=gffrec.exons[i]->start-gffrec.exons[i-1]->end-1;
      if (verbose && ilen>4000000)
@@ -639,18 +639,11 @@ bool GffLoader::process_transcript(GFastaDb& gfasta, GffObj& gffrec) {
     cdsnt=gffrec.getSpliced(faseq, true, &seqlen, NULL, &cds_olen, &seglst, adjustStop);
     //if adjustStop, seqlen has the CDS+3'UTR length, but cds_olen still has the original CDS length
     if (cdsnt!=NULL && cdsnt[0]!='\0') { //has CDS
-         if (seqlen>INT_MAX) {
-           GError("Error: sequence length too large for translateDNA(): %" PRId64 "\n", seqlen);
-         }
-         cdsaa=translateDNA(cdsnt, aalen, (int)seqlen);
+         cdsaa=translateDNA(cdsnt, aalen, seqlen);
          char* p=strchr(cdsaa,'.');
-         int cds_aalen=aalen;
+         int64_t cds_aalen=aalen;
          if (adjustStop) {
-        	 int64_t cds_aalen64=cds_olen/3; //originally stated CDS length
-        	 if (cds_aalen64>INT_MAX) {
-        		 GError("Error: CDS length too large: %" PRId64 "\n", cds_aalen64);
-        	 }
-        	 cds_aalen=(int)cds_aalen64;
+        	 cds_aalen=cds_olen/3; //originally stated CDS length
          }
          endStop=false;
          if (p!=NULL) { //stop codon found
@@ -671,11 +664,7 @@ bool GffLoader::process_transcript(GFastaDb& gfasta, GffObj& gffrec) {
             	  }
             	  if (adjustStop) {
             		  *p='\0';
-            		  int64_t cds_aalen64=(int64_t)(p-cdsaa)+1; //adjusted CDS length
-            		  if (cds_aalen64>INT_MAX) {
-            			  GError("Error: CDS length too large: %" PRId64 "\n", cds_aalen64);
-            		  }
-            		  cds_aalen=(int)cds_aalen64;
+            		  cds_aalen=(int64_t)(p-cdsaa)+1; //adjusted CDS length
             		  seqlen=cds_aalen*3;
             		  aalen=cds_aalen;
             		  int64_t gc=seglst.gmap(seqlen);
@@ -771,10 +760,7 @@ bool GffLoader::process_transcript(GFastaDb& gfasta, GffObj& gffrec) {
 	  }
 	  if (f_y!=NULL) { //CDS translation fasta output requested
 				 if (cdsaa==NULL) { //translate now if not done before
-				   if (seqlen>INT_MAX) {
-					   GError("Error: sequence length too large for translateDNA(): %" PRId64 "\n", seqlen);
-				   }
-				   cdsaa=translateDNA(cdsnt, aalen, (int)seqlen);
+				   cdsaa=translateDNA(cdsnt, aalen, seqlen);
 				 }
 			 if (aalen>0) {
 			   if (cdsaa[aalen-1]=='.' || cdsaa[aalen-1]=='\0') --aalen; //avoid printing the stop codon
